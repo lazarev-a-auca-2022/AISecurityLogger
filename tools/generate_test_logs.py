@@ -89,8 +89,8 @@ def generate_log(log_file, num_logs=10, interval=1.0, include_security=True):
 
 def main():
     parser = argparse.ArgumentParser(description='Generate sample logs for AI Security Logger testing')
-    parser.add_argument('-f', '--file', default='data/logs/sample.log',
-                        help='Log file to write to (default: data/logs/sample.log)')
+    parser.add_argument('-f', '--file', default='../data/logs/sample.log',
+                        help='Log file to write to (default: ../data/logs/sample.log)')
     parser.add_argument('-n', '--num-logs', type=int, default=10,
                         help='Number of logs to generate (default: 10)')
     parser.add_argument('-i', '--interval', type=float, default=1.0,
