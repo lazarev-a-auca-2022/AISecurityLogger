@@ -20,37 +20,37 @@ logger = logging.getLogger(__name__)
 # Sample log patterns
 SAMPLE_LOGS = [
     # Normal logs
-    "[INFO] User logged in: user123",
-    "[INFO] Application started successfully",
-    "[INFO] Database connection established",
-    "[INFO] Cache refreshed at {timestamp}",
-    "[INFO] API request completed in 120ms",
+    "User logged in: user123",
+    "Application started successfully",
+    "Database connection established",
+    "Cache refreshed at {timestamp}",
+    "API request completed in 120ms",
     
     # Warning logs
-    "[WARNING] High CPU usage detected: 85%",
-    "[WARNING] Memory usage approaching threshold: 75%",
-    "[WARNING] Slow database query detected (took 3.5s)",
-    "[WARNING] Rate limit approaching for client 192.168.1.100",
-    "[WARNING] API endpoint /api/v1/data deprecated, will be removed in next version",
+    "High CPU usage detected: 85%",
+    "Memory usage approaching threshold: 75%",
+    "Slow database query detected (took 3.5s)",
+    "Rate limit approaching for client 192.168.1.100",
+    "API endpoint /api/v1/data deprecated, will be removed in next version",
     
     # Error logs
-    "[ERROR] Database query failed: connection timeout",
-    "[ERROR] Failed to process request: invalid parameters",
-    "[ERROR] Out of memory error in background worker",
-    "[ERROR] API service unavailable after 3 retry attempts",
-    "[ERROR] Cache refresh failed: Redis connection error",
+    "Database query failed: connection timeout",
+    "Failed to process request: invalid parameters",
+    "Out of memory error in background worker",
+    "API service unavailable after 3 retry attempts",
+    "Cache refresh failed: Redis connection error",
     
     # Security relevant logs
-    "[WARN] Multiple failed login attempts for user admin from IP 203.0.113.42",
-    "[ERROR] Authentication failed: Invalid credentials for admin account from IP 203.0.113.42",
-    "[CRITICAL] Possible brute force attack detected from IP 203.0.113.42 (10 failed attempts)",
-    "[WARN] Unusual access pattern detected: user123 accessing admin resources",
-    "[CRITICAL] File permission change detected on /etc/passwd",
-    "[ERROR] Firewall rule violation: outbound connection to known malicious IP 185.143.223.12",
-    "[WARN] SSH login from unusual geographic location: admin from Country: Russia",
-    "[CRITICAL] Database dump attempt detected from unauthorized process",
-    "[ERROR] Unexpected privilege escalation detected for user: guest",
-    "[WARN] Unusual file access pattern detected in /var/www/html",
+    "Multiple failed login attempts for user admin from IP 203.0.113.42",
+    "Authentication failed: Invalid credentials for admin account from IP 203.0.113.42",
+    "Possible brute force attack detected from IP 203.0.113.42 (10 failed attempts)",
+    "Unusual access pattern detected: user123 accessing admin resources",
+    "File permission change detected on /etc/passwd",
+    "Firewall rule violation: outbound connection to known malicious IP 185.143.223.12",
+    "SSH login from unusual geographic location: admin from Country: Russia",
+    "Database dump attempt detected from unauthorized process",
+    "Unexpected privilege escalation detected for user: guest",
+    "Unusual file access pattern detected in /var/www/html",
 ]
 
 def generate_log(log_file, num_logs=10, interval=1.0, include_security=True):
