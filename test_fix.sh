@@ -36,7 +36,7 @@ export TEST_LOGS_DIR="$(pwd)/test_logs"
 echo "Test logs directory: $TEST_LOGS_DIR"
 
 # Add test logs directory to the settings if needed
-python -c "
+python3 -c "
 import json
 import os
 
@@ -58,6 +58,6 @@ else:
 
 # Run the application
 echo "Starting the application..."
-python src/main.py
+python3 src/main.py
 
 echo "Test complete!"

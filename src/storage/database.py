@@ -124,7 +124,7 @@ class Database:
                 
                 # Convert rows to dictionaries
                 threats = []
-                async for row in cursor:
+                for row in rows:
                     threat = {
                         'id': row[0],
                         'timestamp': row[1],

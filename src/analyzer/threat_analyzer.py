@@ -18,12 +18,13 @@ class ThreatAnalyzer:
     for security threat analysis
     """
     
-    def __init__(self, settings):
+    def __init__(self, settings, database=None):
         self.settings = settings
         self.logger = logging.getLogger(__name__)
         self.session = None
         self.queue = []
         self.processing = False
+        self.database = database
         
         # Create a prompt template for the AI API
         self.prompt_template = """
@@ -170,8 +171,15 @@ class ThreatAnalyzer:
                 
                 if analysis_result and analysis_result.get('threat_detected'):
                     self.logger.warning(f"Threat detected: {analysis_result.get('summary')}")
-                    # Here we would store the result in database (to be implemented in storage module)
-                    # await self.database.store_threat(analysis_result)
+                    # Store the result in database
+                    if self.database:
+                        try:
+                            threat_id = await self.database.store_threat(analysis_result)
+                            self.logger.info(f"Threat saved to database with ID: {threat_id}")
+                        except Exception as db_error:
+                            self.logger.error(f"Failed to save threat to database: {db_error}")
+                    else:
+                        self.logger.warning("Database not available, threat not saved")
                 
                 return analysis_result
             

@@ -24,7 +24,7 @@ class AISecurityLogger:
     def __init__(self):
         self.settings = Settings()
         self.database = Database(self.settings.db_path)
-        self.threat_analyzer = ThreatAnalyzer(self.settings)
+        self.threat_analyzer = ThreatAnalyzer(self.settings, self.database)
         self.log_ingestor = LogIngestor(self.settings, self.threat_analyzer)
         self.report_generator = ReportGenerator(self.settings, self.database)
         self.running = False
