@@ -2,83 +2,83 @@ import unittest
 import sys
 import os
 from unittest.mock import patch, MagicMock
-
-import unittest
-import sys
-import os
-from unittest.mock import patch, MagicMock
+import asyncio
 
 # Mock external dependencies at the very top
-sys.modules['flask'] = MagicMock()
-sys.modules['flask.json'] = MagicMock()
-sys.modules['flask.request'] = MagicMock()
-sys.modules['flask.jsonify'] = MagicMock()
-sys.modules['flask_cors'] = MagicMock()
-sys.modules['flask_cors.CORS'] = MagicMock()
 sys.modules['fastapi'] = MagicMock()
 sys.modules['fastapi.staticfiles'] = MagicMock()
 sys.modules['elasticsearch'] = MagicMock()
-sys.modules['kafka'] = MagicMock() # Add kafka mock
 
 # Add the parent directory to the sys.path to allow imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import the api module after setting up all external mocks
-import reporting_layer.api as api_module
+from reporting_layer import api
 
 class TestAPI(unittest.TestCase):
     def setUp(self):
-        self.app = api_module.app.test_client()
-        self.app.testing = True
+        pass
 
-    @patch('storage_layer.es_indexer.ESIndexer')
-    def test_get_logs(self, MockESIndexer):
-        # Configure the mock instance that api.py will use
-        mock_es_indexer_instance = MockESIndexer.return_value
-        mock_es_indexer_instance.search_logs.return_value = {"hits": {"hits": [{"_source": {"message": "test log"}}]}}
+    @patch('reporting_layer.api.Elasticsearch')
+    def test_get_alerts(self, MockElasticsearch):
+        # Configure the mock Elasticsearch instance
+        mock_es_instance = MockElasticsearch.return_value
+        mock_es_instance.search.return_value = {
+            "hits": {
+                "hits": [
+                    {"_source": {"description": "test alert", "timestamp": "2023-01-01T10:00:00Z"}}
+                ]
+            }
+        }
 
-        response = self.app.get('/logs')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"test log", response.data)
-        mock_es_indexer_instance.search_logs.assert_called_once()
+        # Test the get_alerts function
+        result = asyncio.run(api.get_alerts(size=10))
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn("alerts", result)
+        self.assertEqual(len(result["alerts"]), 1)
+        self.assertEqual(result["alerts"][0]["description"], "test alert")
+        mock_es_instance.search.assert_called_once()
 
-    @patch('storage_layer.es_indexer.ESIndexer')
-    @patch('processing_layer.log_normalizer.LogNormalizer')
-    @patch('processing_layer.ai_analysis.ai_analysis_module.AIAnalysisModule')
-    def test_post_log(self, MockAIAnalysisModule, MockLogNormalizer, MockESIndexer):
-        mock_es_indexer_instance = MockESIndexer.return_value
-        mock_log_normalizer_instance = MockLogNormalizer.return_value
-        mock_ai_analysis_module_instance = MockAIAnalysisModule.return_value
+    @patch('reporting_layer.api.Elasticsearch')
+    def test_get_logs(self, MockElasticsearch):
+        # Configure the mock Elasticsearch instance
+        mock_es_instance = MockElasticsearch.return_value
+        mock_es_instance.search.return_value = {
+            "hits": {
+                "hits": [
+                    {"_source": {"message": "test log", "level": "info"}}
+                ]
+            }
+        }
 
-        mock_log_normalizer_instance.normalize_log.return_value = {"normalized": "log"}
-        mock_ai_analysis_module_instance.analyze_log_for_threats.return_value = {"threat_detected": False}
-        mock_es_indexer_instance.index_log.return_value = {"result": "created"}
+        # Test the get_logs function
+        result = asyncio.run(api.get_logs(size=10))
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn("logs", result)
+        self.assertEqual(len(result["logs"]), 1)
+        self.assertEqual(result["logs"][0]["message"], "test log")
+        mock_es_instance.search.assert_called_once()
 
-        response = self.app.post('/log', json={"raw_log": "test raw log"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Log processed and indexed", response.data)
-        mock_log_normalizer_instance.normalize_log.assert_called_once_with("test raw log")
-        mock_ai_analysis_module_instance.analyze_log_for_threats.assert_called_once_with({"normalized": "log"})
-        mock_es_indexer_instance.index_log.assert_called_once_with({"normalized": "log", "ai_analysis": {"threat_detected": False}})
+    @patch('reporting_layer.api.Elasticsearch')
+    def test_get_alerts_with_error(self, MockElasticsearch):
+        # Configure the mock to raise an exception
+        mock_es_instance = MockElasticsearch.return_value
+        mock_es_instance.search.side_effect = Exception("Connection error")
 
-    @patch('storage_layer.es_indexer.ESIndexer')
-    @patch('detection_correlation_layer.correlation_engine.correlation_engine.CorrelationEngine')
-    @patch('detection_correlation_layer.conflict_resolution_mechanism.conflict_resolution_mechanism.ConflictResolutionMechanism')
-    def test_get_correlated_events(self, MockConflictResolutionMechanism, MockCorrelationEngine, MockESIndexer):
-        mock_es_indexer_instance = MockESIndexer.return_value
-        mock_correlation_engine_instance = MockCorrelationEngine.return_value
-        mock_conflict_resolution_mechanism_instance = MockConflictResolutionMechanism.return_value
+        # Test the get_alerts function with error
+        result = asyncio.run(api.get_alerts())
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn("alerts", result)
+        self.assertIn("error", result)
+        self.assertEqual(result["alerts"], [])
+        self.assertEqual(result["error"], "Connection error")
 
-        mock_es_indexer_instance.search_logs.return_value = {"hits": {"hits": [{"_source": {"message": "event1"}}, {"_source": {"message": "event2"}}]}}
-        mock_correlation_engine_instance.correlate_logs.return_value = [{"correlated": "event"}]
-        mock_conflict_resolution_mechanism_instance.resolve_conflict.return_value = [{"resolved": "event"}]
-
-        response = self.app.get('/correlated_events')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"resolved", response.data)
-        mock_es_indexer_instance.search_logs.assert_called_once()
-        mock_correlation_engine_instance.correlate_logs.assert_called_once()
-        mock_conflict_resolution_mechanism_instance.resolve_conflict.assert_called_once()
+    def test_fastapi_app_creation(self):
+        # Test that the FastAPI app is created
+        self.assertIsNotNone(api.app)
 
 if __name__ == '__main__':
     unittest.main()
