@@ -6,8 +6,34 @@ services:
     container_name: ai-security-logger
     restart: unless-stopped
     environment:
+      # AI Provider Configuration
+      - AI_PROVIDER=${AI_PROVIDER:-google}
+      # OpenRouter Configuration
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_MODEL_ID=${OPENROUTER_MODEL_ID:-openai/gpt-3.5-turbo}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      # Google AI Configuration
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_MODEL_ID=${GOOGLE_MODEL_ID:-gemini-2.5-flash-preview-05-20}
+      - GOOGLE_BASE_URL=${GOOGLE_BASE_URL:-https://generativelanguage.googleapis.com}
+      - GOOGLE_API_VERSION=${GOOGLE_API_VERSION:-v1}
+      # OpenAI Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL_ID=${OPENAI_MODEL_ID:-gpt-4o-mini}
+      # Azure Configuration
+      - AZURE_API_KEY=${AZURE_API_KEY}
+      - AZURE_MODEL_ID=${AZURE_MODEL_ID}
+      - AZURE_BASE_URL=${AZURE_BASE_URL}
+      - AZURE_API_VERSION=${AZURE_API_VERSION}
+      - AZURE_DEPLOYMENT_NAME=${AZURE_DEPLOYMENT_NAME}
+      # Anthropic Configuration
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL_ID=${ANTHROPIC_MODEL_ID}
+      # Custom Provider Configuration
+      - CUSTOM_API_KEY=${CUSTOM_API_KEY}
+      - CUSTOM_MODEL_ID=${CUSTOM_MODEL_ID}
+      - CUSTOM_BASE_URL=${CUSTOM_BASE_URL}
+      # Log Sources Configuration
       - LOG_SOURCES=/app/data/logs
       - PROCESSING_INTERVAL=60
       - SENSITIVITY_KEYWORDS=error,failed,denied,warning,critical,unauthorized,attack,breach,malware,virus
@@ -20,6 +46,7 @@ services:
       - ./data/db:/app/data/db
       - ./reports:/app/reports
       - ./config:/app/config
+      - ./.env:/app/.env
     ports:
       - "8081:8080"
     healthcheck:
