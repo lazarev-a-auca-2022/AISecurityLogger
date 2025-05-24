@@ -7,6 +7,7 @@ import datetime
 import json
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
@@ -20,6 +21,8 @@ class ReportGenerator:
         self.logger = logging.getLogger(__name__)
         self.running = False
         self.scheduler_task = None
+        self.last_report_time = 0
+        self.min_report_interval = 300  # Minimum 5 minutes between reports
     
     async def start_scheduler(self):
         """Start the report scheduler"""
@@ -29,14 +32,15 @@ class ReportGenerator:
         # Schedule based on configured interval
         interval_seconds = self._get_schedule_interval()
         
-        # Initial report on startup
-        await self.generate_report()
+        # Initial report on startup (forced)
+        await self.generate_report(force=True)
         
         # Schedule periodic reports
         while self.running:
             try:
                 await asyncio.sleep(interval_seconds)
                 if self.running:  # Check again after sleep
+                    # Non-forced, will respect the minimum interval
                     await self.generate_report()
             except asyncio.CancelledError:
                 self.logger.info("Report scheduler task cancelled")
@@ -74,8 +78,16 @@ class ReportGenerator:
     
     async def generate_report(self, 
                             time_range: Optional[int] = None, 
-                            output_format: str = 'html') -> str:
+                            output_format: str = 'html',
+                            force: bool = False) -> str:
         """Generate a report of security threats"""
+        current_time = time.time()
+        
+        # Check if we've generated a report recently (to prevent duplicates)
+        if not force and (current_time - self.last_report_time) < self.min_report_interval:
+            self.logger.info(f"Skipping report generation - last report was generated {int(current_time - self.last_report_time)} seconds ago")
+            return ""
+            
         self.logger.info("Generating security threat report...")
         
         try:
@@ -91,9 +103,11 @@ class ReportGenerator:
                 else:
                     time_range = 24 * 60 * 60  # Default to daily
             
-            # Calculate time range
+            # Calculate time range - Use a wider range to ensure we catch all threats
             end_time = datetime.datetime.now().timestamp()
-            start_time = end_time - time_range
+            start_time = end_time - (time_range * 3)  # Multiply by 3 to extend the window
+            
+            self.logger.debug(f"Retrieving threats from {datetime.datetime.fromtimestamp(start_time)} to {datetime.datetime.fromtimestamp(end_time)}")
             
             # Get threats from database
             threats = await self.database.get_threats(
@@ -110,6 +124,12 @@ class ReportGenerator:
                 report_content = self._generate_html_report(threats, start_time, end_time)
                 file_ext = 'html'
             
+            # Log threat count for debugging
+            self.logger.info(f"Found {len(threats)} threats for report")
+            if threats:
+                for idx, threat in enumerate(threats):
+                    self.logger.debug(f"Threat {idx+1}: {threat.get('summary', 'No summary')} - {threat.get('severity', 'UNKNOWN')}")
+            
             # Save the report
             timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
             report_filename = f"security_report_{timestamp}.{file_ext}"
@@ -123,6 +143,9 @@ class ReportGenerator:
                 f.write(report_content)
             
             self.logger.info(f"Report generated successfully: {report_path}")
+            
+            # Update last report time
+            self.last_report_time = time.time()
             
             # Create 'latest' symlink or copy
             latest_path = os.path.join(self.settings.output_log_dir, f"latest_report.{file_ext}")
@@ -306,26 +329,37 @@ class ReportGenerator:
     
     def _generate_threats_html(self, threats: List[Dict[str, Any]]) -> str:
         """Generate HTML for the threats section"""
+        if not threats:
+            return '<div class="empty-message">No threats detected during this period.</div>'
+            
         threats_html = ""
         
         for threat in threats:
-            severity = threat.get('severity', 'INFO')
-            timestamp = datetime.datetime.fromtimestamp(threat.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M:%S')
-            
-            # Generate log entries HTML
-            log_entries = threat.get('log_entries', [])
-            log_entries_html = ""
-            
-            for entry in log_entries:
-                source = entry.get('source_file', 'unknown')
-                raw_line = entry.get('raw_line', '')
-                log_entries_html += f"[{source}] {raw_line}\\n"
-            
-            # Build the threat HTML
-            threats_html += f"""
+            try:
+                severity = threat.get('severity', 'INFO')
+                timestamp = datetime.datetime.fromtimestamp(threat.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M:%S')
+                summary = threat.get('summary', 'Unknown Threat')
+                
+                # Generate log entries HTML
+                log_entries = threat.get('log_entries', [])
+                log_entries_html = ""
+                
+                if log_entries:
+                    for entry in log_entries:
+                        if isinstance(entry, dict):
+                            source = entry.get('source_file', 'unknown')
+                            raw_line = entry.get('raw_line', '')
+                            log_entries_html += f"[{source}] {raw_line}\\n"
+                        else:
+                            log_entries_html += f"{str(entry)}\\n"
+                else:
+                    log_entries_html = "No log entries available"
+                
+                # Build the threat HTML
+                threats_html += f"""
     <div class="threat">
         <div class="threat-header">
-            <h3>{threat.get('summary', 'Unknown Threat')}</h3>
+            <h3>{summary}</h3>
             <span class="severity {severity}">{severity}</span>
         </div>
         <p><strong>Time:</strong> {timestamp}</p>
@@ -337,6 +371,17 @@ class ReportGenerator:
             <summary>Log Entries</summary>
             <div class="log-entries">{log_entries_html}</div>
         </details>
+    </div>
+"""
+            except Exception as e:
+                self.logger.error(f"Error formatting threat for HTML: {e}")
+                threats_html += f"""
+    <div class="threat">
+        <div class="threat-header">
+            <h3>Error Processing Threat</h3>
+            <span class="severity WARNING">WARNING</span>
+        </div>
+        <p>There was an error processing this threat data.</p>
     </div>
 """
         

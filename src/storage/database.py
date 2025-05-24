@@ -58,8 +58,30 @@ class Database:
     async def store_threat(self, threat_data: Dict[str, Any]) -> int:
         """Store a threat in the database"""
         try:
-            # Convert log entries to JSON string
-            log_entries_json = json.dumps(threat_data.get('log_entries', []))
+            # Ensure log_entries is a serializable format
+            log_entries = threat_data.get('log_entries', [])
+            
+            try:
+                # Test if it can be serialized directly
+                log_entries_json = json.dumps(log_entries)
+            except (TypeError, ValueError) as json_error:
+                # If not, convert to a simpler format
+                self.logger.warning(f"Converting log entries to simple format due to serialization error: {json_error}")
+                simplified_entries = []
+                for entry in log_entries:
+                    if isinstance(entry, dict):
+                        # Keep only serializable fields
+                        simple_entry = {
+                            'source_file': str(entry.get('source_file', 'unknown')),
+                            'log_type': str(entry.get('log_type', 'unknown')),
+                            'raw_line': str(entry.get('raw_line', '')),
+                        }
+                        simplified_entries.append(simple_entry)
+                    else:
+                        # If it's not a dict, convert to string
+                        simplified_entries.append(str(entry))
+                
+                log_entries_json = json.dumps(simplified_entries)
             
             # Insert threat into database
             cursor = await self.db.execute('''
@@ -118,25 +140,35 @@ class Database:
             query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
             params.extend([limit, offset])
             
+            self.logger.debug(f"Executing query: {query} with params: {params}")
+            
             # Execute query
             async with self.db.execute(query, params) as cursor:
                 rows = await cursor.fetchall()
                 
+                self.logger.debug(f"Found {len(rows)} threats in database")
+                
                 # Convert rows to dictionaries
                 threats = []
                 for row in rows:
-                    threat = {
-                        'id': row[0],
-                        'timestamp': row[1],
-                        'detected_at': row[2],
-                        'threat_detected': bool(row[3]),
-                        'severity': row[4],
-                        'summary': row[5],
-                        'details': row[6],
-                        'recommended_actions': row[7],
-                        'log_entries': json.loads(row[8])
-                    }
-                    threats.append(threat)
+                    try:
+                        log_entries_json = row[8]
+                        log_entries = json.loads(log_entries_json) if log_entries_json else []
+                        
+                        threat = {
+                            'id': row[0],
+                            'timestamp': row[1],
+                            'detected_at': row[2],
+                            'threat_detected': bool(row[3]),
+                            'severity': row[4],
+                            'summary': row[5],
+                            'details': row[6],
+                            'recommended_actions': row[7],
+                            'log_entries': log_entries
+                        }
+                        threats.append(threat)
+                    except Exception as row_error:
+                        self.logger.error(f"Error processing threat row: {row_error}")
                 
                 return threats
                 
