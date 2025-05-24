@@ -1,92 +1,150 @@
-# AI Logger
+      
+# AI-Powered Log Processor - Architecture (MVP)
 
-## Architecture Layers
+## 1. Overview
 
-### 1. Ingestion Layer
+This document outlines the architecture for an MVP (Minimum Viable Product) of an AI-Powered Log Processor. The system is designed to run on a server managed by FastPanel, ingesting various server and application logs. It utilizes an external NLP model via OpenRouter API for threat detection and generates concise threat/error summaries. The architecture prioritizes simplicity for MVP, with considerations for future scalability.
 
-Responsible for collecting raw logs from various sources and reliably queuing them for processing.
+## 2. Core Goals (MVP)
 
--   **Components:**
-    -   **FluentD (or similar scalable log collector):** Collects logs from diverse sources. Configuration will emphasize robust error handling and buffering.
-    -   **Kafka (or other distributed message queue):** Acts as a high-throughput, fault-tolerant message queue to handle varying log volumes and prevent data loss during processing spikes. Scalability and tuning will be prioritized.
+*   Ingest logs from configurable sources (e.g., syslog, web server logs, application logs).
+*   Pre-process and normalize log entries.
+*   Send relevant log snippets/patterns to an OpenRouter NLP model for analysis.
+*   Receive and interpret the NLP model's threat assessment.
+*   Store detected threats and their summaries.
+*   Provide a simple mechanism to view these summaries (e.g., a daily digest file or a simple DB query).
+*   Ensure secure handling of the OpenRouter API key.
+*   Be deployable and manageable within a FastPanel environment.
 
-### 2. Processing Layer
+## 3. Architecture Diagram (Conceptual)
 
-Focuses on transforming raw logs into structured data and performing initial analysis.
+    
++---------------------+ +---------------------+ +-----------------------+
+| Log Sources |----->| Log Ingestor & |----->| AI Threat Analyzer |
+| (e.g., syslog, | | Preprocessor | | (Python Service) |
+| Nginx, App Logs) | | (Python Script/ | | - Formats request |
++---------------------+ | Service) | | - Calls OpenRouter API|
+| - Watches files/dirs| | - Parses response |
+| - Basic parsing | +-----------+-----------+
+| - Filtering | |
++---------+-----------+ | (Threat Summary)
+| |
+|(Filtered/Normalized Logs) |
+| |
+v v
++---------------------+ +-----------------------+
+| Log & Threat Storage|----->| Summary Access Point |
+| (SQLite DB / | | (e.g., Cron-generated |
+| JSON Log Files) | | Report, Simple CLI) |
++---------------------+ +-----------------------+
 
--   **Components:**
-    -   **Log Normalization and Structuring Module:** Processes logs from the ingestion layer, normalizing formats and extracting relevant metadata. This module will be designed for scalability.
-    -   **Wazuh (or similar SIEM/log analysis platform):** Performs rule-based analysis, acts as a security event and information management system, and provides search capabilities. Integration with the normalization module will ensure structured data is processed.
-    -   **AI Analysis Module (FastAPI with Fine-tuned NLP Model, along with Google AI Studio):** Receives structured logs or relevant data extracts. A FastAPI application will manage batch processing for efficiency. The core will be a fine-tuned NLP model specifically trained on security-relevant log data to improve accuracy and reduce false positives/negatives. This module will be designed for horizontal scaling.
++-----------------------------+
+| Configuration |
+| (config.ini / .env file) |
+| - Log paths |
+| - OpenRouter API Key |
+| - NLP Model ID |
+| - Detection Thresholds |
++-----------------------------+
 
-### 3. Detection & Correlation Layer
+## 4. Components
 
-Correlates findings from rule-based analysis (Wazuh) and AI analysis to identify potential threats and generate alerts.
+### 4.1. Log Sources
+*   **Description:** Standard system and application logs.
+    *   System Logs (e.g., `/var/log/syslog`, `/var/log/auth.log`)
+    *   Web Server Logs (e.g., Nginx `access.log`, `error.log` managed by FastPanel)
+    *   Application Logs (custom application log files)
+*   **Integration:** The processor will need read access to these files/streams.
 
--   **Components:**
-    -   **Correlation Engine:** This component will receive outputs from Wazuh alerts and the AI analysis module. It will implement sophisticated correlation rules and logic to identify complex attack patterns.
-    -   **Conflict Resolution Mechanism:** A critical part of the correlation engine, designed to handle potential discrepancies between Wazuh and AI findings, prioritizing alerts based on defined confidence levels and rules.
+### 4.2. Configuration
+*   **Description:** A central place for all settings.
+*   **Technology:** `.env` file (using `python-dotenv`) or `config.ini` (using `configparser`).
+*   **Contents (MVP):**
+    *   `OPENROUTER_API_KEY`
+    *   `OPENROUTER_MODEL_ID` (e.g., "openai/gpt-3.5-turbo-instruct" or a free tier model)
+    *   `LOG_SOURCES`: A list of files or directories to monitor.
+    *   `PROCESSING_INTERVAL`: How often to check for new logs.
+    *   `SENSITIVITY_KEYWORDS`: Simple keywords to pre-filter logs before sending to AI (e.g., "error", "failed", "denied", "warning", "critical").
+    *   `DB_PATH` (if using SQLite) or `OUTPUT_LOG_DIR`.
 
-### 4. Storage Layer
+### 4.3. Log Ingestor & Preprocessor
+*   **Description:** A service or script responsible for collecting, tailing, and performing initial processing of log entries.
+*   **Technology:** Python script/service (e.g., using libraries like `watchdog` for file monitoring or simply `tail -f` piped to script).
+*   **Responsibilities:**
+    1.  Monitor configured log files/directories for new entries.
+    2.  Perform basic parsing (e.g., timestamp extraction, regex for common formats if possible).
+    3.  Filter logs based on `SENSITIVITY_KEYWORDS` or basic heuristics to reduce noise and API calls.
+    4.  Queue or directly pass relevant log entries to the AI Threat Analyzer.
+*   **Scalability Note:** For MVP, this can be a single Python script. For scaling, this could involve a dedicated log shipper (like Filebeat) sending to a message queue (like Redis or RabbitMQ) which the preprocessor consumes.
 
-Provides persistent storage and indexing for normalized, processed, and analyzed log data.
+### 4.4. AI Threat Analyzer
+*   **Description:** The core component that interacts with the OpenRouter NLP model.
+*   **Technology:** Python service/module (using `requests` library for API calls).
+*   **Responsibilities:**
+    1.  Receive pre-processed log entries.
+    2.  Construct a suitable prompt for the OpenRouter NLP model. The prompt should instruct the model to:
+        *   Analyze the provided log snippet(s) for potential security threats, errors, or anomalies.
+        *   Provide a concise summary of the findings.
+        *   Categorize the severity (e.g., INFO, WARNING, ERROR, CRITICAL).
+        *   Example Prompt: `"Analyze the following log entries for security threats or critical errors. Summarize any findings concisely and indicate severity (INFO, WARNING, ERROR, CRITICAL):\n\n[LOG_ENTRY_1]\n[LOG_ENTRY_2]..."`
+    3.  Make an API call to OpenRouter using the configured API key and model.
+    4.  Parse the JSON response from OpenRouter.
+    5.  Extract the threat summary and severity.
+    6.  Pass the enriched information (original log, AI summary, severity) to Log & Threat Storage.
+*   **Security:** The OpenRouter API key must be read from the secure configuration and not hardcoded.
 
--   **Components:**
-    -   **MyScaleDB (or benchmarked alternative like ClickHouse/Elasticsearch):** Selected based on performance benchmarking for efficient storage, indexing, and querying of large volumes of time-series and structured data. Sharding and indexing strategies will be implemented for optimal performance and scalability.
+### 4.5. Log & Threat Storage
+*   **Description:** Stores both the original (or pre-processed) logs that triggered an alert and the AI-generated threat summaries.
+*   **Technology (MVP):**
+    *   **SQLite Database:** Simple, file-based, easy to set up. Schema: `(timestamp, source_log, original_log_entry, ai_summary, severity, processed_at)`.
+    *   **Alternatively (simpler MVP):** Structured JSON log files appended to a daily/hourly file.
+*   **Scalability Note:** For future scaling, this would migrate to a more robust database like PostgreSQL or a specialized log database.
 
-### 5. Reporting & Presentation Layer
+### 4.6. Summary Access Point
+*   **Description:** A way for the user/admin to view the detected threats and summaries.
+*   **Technology (MVP):**
+    *   **Cron Job + Script:** A Python script run by cron (e.g., daily) that queries the SQLite DB (or parses JSON logs) and generates a simple text report (e.g., emailed or saved to a file in a FastPanel-accessible web directory).
+    *   **Simple CLI Tool:** A command-line interface to query recent threats.
+*   **FastPanel Integration:** The output report could be placed in a directory served by Nginx/Apache, making it viewable via a browser.
 
-Provides interfaces for viewing alerts, generating reports, and accessing analyzed data.
+## 5. Data Flow
 
--   **Components:**
-    -   **Reporting Module (e.g., Wazuh Reporting or custom):** Generates comprehensive reports based on detected threats and system activity.
-    -   **API and User Interface:** Provides programmatic access to alerts and data, and a user interface for monitoring and investigation.
+1.  **Log Generation:** System services, web servers, and applications generate logs.
+2.  **Ingestion & Pre-processing:** The `Log Ingestor & Preprocessor` tails/reads these logs. It applies basic filters (keywords, regex) and normalization.
+3.  **AI Analysis Trigger:** If a log entry passes pre-processing filters, it's sent to the `AI Threat Analyzer`.
+4.  **OpenRouter API Call:** The `AI Threat Analyzer` formats a prompt with the log data and sends it to the configured OpenRouter NLP model.
+5.  **AI Response:** OpenRouter processes the request and returns a JSON response containing the analysis (threat summary, severity).
+6.  **Storage:** The `AI Threat Analyzer` parses this response and stores the original log snippet, AI summary, and severity in the `Log & Threat Storage` (SQLite DB or JSON files).
+7.  **Reporting:** The `Summary Access Point` (e.g., daily cron job) queries the storage and generates a human-readable summary/report.
 
-### 6. Orchestration & Management Layer
+## 6. FastPanel Integration
 
-Oversees the entire pipeline, managing component health, scaling, configuration, and monitoring.
+*   **Deployment:** The Python application (Ingestor, Analyzer) will run as a systemd service or a supervised script. FastPanel's interface might not directly manage Python apps, but server access (SSH, file manager) allows setup.
+*   **Log Access:** FastPanel configures web servers (Nginx/Apache), so their log paths are known and can be configured in the processor.
+*   **Configuration Management:** Config files (`.env` or `config.ini`) can be managed via FastPanel's file editor or SSH.
+*   **Resource Monitoring:** FastPanel's server monitoring can help observe the resource usage of the processor.
+*   **Report Access (Optional):** If reports are generated as HTML/text files, they can be placed in a web-accessible directory configured via FastPanel.
+*   **Firewall:** Ensure outbound connections to `openrouter.ai` are allowed if a firewall is active.
 
--   **Components:**
-    -   **Orchestration Platform (e.g., Kubernetes):** Manages the deployment, scaling, and health of all microservices and components.
-    -   **Monitoring and Alerting System:** Provides visibility into the pipeline's performance, identifies issues, and triggers alerts for operational concerns.
+## 7. Scalability Considerations (Beyond MVP)
 
-## Data Pipelining
+*   **Message Queue:** Introduce a message queue (e.g., Redis, RabbitMQ) between the `Log Ingestor` and `AI Threat Analyzer` to decouple components and handle bursts of logs.
+*   **Dedicated Workers:** Scale the `AI Threat Analyzer` component by running multiple instances (workers) consuming from the message queue.
+*   **Database:** Migrate from SQLite to a more robust database like PostgreSQL for better concurrency and data management.
+*   **Advanced Pre-processing:** Implement more sophisticated pre-filtering and log parsing before sending to the AI to reduce costs and improve AI focus.
+*   **Rate Limiting & Retries:** Implement robust rate limiting and retry mechanisms for OpenRouter API calls.
+*   **Web UI:** Develop a simple web interface (e.g., using Flask/FastAPI) for configuration, viewing dashboards, and managing threats, potentially hosted via FastPanel.
 
-Data flows through the architecture in a clear pipeline:
+## 8. Technology Stack (MVP Summary)
 
-1.  Raw logs are collected by FluentD and sent to Kafka.
-2.  The Processing Layer consumes messages from Kafka. Logs are normalized and structured.
-3.  Normalized logs are fed into Wazuh for rule-based analysis and also sent to the AI Analysis Module for deep learning analysis.
-4.  Outputs from Wazuh and the AI Analysis Module are sent to the Detection & Correlation Layer.
-5.  The Correlation Engine processes these inputs, applies conflict resolution, and generates alerts for identified threats.
-6.  Normalized logs, analysis results, and alerts are stored in the Storage Layer.
-7.  The Reporting & Presentation Layer accesses data from the Storage Layer and Detection & Correlation Layer to provide reports and a user interface.
-8.  The Orchestration & Management Layer monitors and controls all components across the pipeline.
-
-## Roadmap
-
-The development roadmap focuses on building out the layered architecture and addressing key areas for optimization:
-
-1.  **Phase 1: Core Pipeline MVP:** Implement the basic data flow through the Ingestion, Processing (Normalization, initial Wazuh integration), and Storage layers.
-2.  **Phase 2: AI Integration:** Integrate the AI Analysis Module with a base NLP model and connect it to the pipeline.
-3.  **Phase 3: Detection & Correlation:** Develop the Correlation Engine and Conflict Resolution Mechanism.
-4.  **Phase 4: Reporting & UI:** Build out the Reporting & Presentation Layer.
-5.  **Phase 5: Optimization and Hardening:**
-    -   Conduct comprehensive stress testing and optimize components for scalability (FluentD, Kafka, FastAPI).
-    -   Fine-tune or train the NLP model with security-specific data.
-    -   Benchmark and finalize the Storage Layer solution (MyScaleDB vs. alternatives).
-    -   Refine correlation rules and conflict resolution logic.
-    -   Implement robust error handling and monitoring.
-6.  **Phase 6: Advanced Features:** Explore alternative architectural patterns (e.g., ELT), integrate external threat intelligence feeds, and enhance AI capabilities.
-
-## Solutions
-
--   **Scalability:** Utilizing distributed systems like Kafka and designing components for horizontal scaling (FluentD, AI Module, Normalization Module) mitigates bottlenecks under high load. Stress testing is a key roadmap item.
--   **AI Model Accuracy:** The roadmap includes explicit steps for fine-tuning or training the NLP model on security data.
--   **Threat Detection Conflicts:** The dedicated Conflict Resolution Mechanism within the Detection & Correlation Layer is designed to manage disagreements between rule-based and AI findings.
--   **Storage Performance:** Benchmarking storage solutions and implementing proper indexing and sharding strategies ensures efficient data handling.
--   **Diverse Log Formats and Edge Cases:** The Normalization and Structuring Module is responsible for handling various formats, and comprehensive testing is included in the roadmap.
--   **AI Reliability:** Fine-tuning and potential future mechanisms for feedback loops aim to improve AI accuracy and reduce hallucination.
--   **Wazuh API Limitations:** While Wazuh is a component, the architecture allows for alternative data access patterns if API limitations become a significant issue.
--   **Optimal Data for AI:** The architecture allows flexibility in providing either normalized or potentially raw data to the AI module, which can be optimized during development.
--   **Over-reliance on Wazuh:** While integrated, the architecture distributes key functions across layers and includes a separate AI analysis path, reducing single-point dependency.
+*   **Language:** Python 3.x
+*   **Key Python Libraries:**
+    *   `requests` (for OpenRouter API)
+    *   `python-dotenv` or `configparser` (for configuration)
+    *   `sqlite3` (for database)
+    *   `watchdog` (optional, for efficient file monitoring)
+    *   Standard library modules (`os`, `re`, `json`, `datetime`)
+*   **External Services:** OpenRouter API
+*   **Storage:** SQLite / Flat Files (JSON)
+*   **Deployment Environment:** Linux server managed by FastPanel.
+*   **Process Management:** `systemd` service or a simple supervisor script.
