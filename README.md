@@ -17,7 +17,7 @@ Focuses on transforming raw logs into structured data and performing initial ana
 -   **Components:**
     -   **Log Normalization and Structuring Module:** Processes logs from the ingestion layer, normalizing formats and extracting relevant metadata. This module will be designed for scalability.
     -   **Wazuh (or similar SIEM/log analysis platform):** Performs rule-based analysis, acts as a security event and information management system, and provides search capabilities. Integration with the normalization module will ensure structured data is processed.
-    -   **AI Analysis Module (FastAPI with Fine-tuned NLP Model):** Receives structured logs or relevant data extracts. A FastAPI application will manage batch processing for efficiency. The core will be a fine-tuned NLP model specifically trained on security-relevant log data to improve accuracy and reduce false positives/negatives. This module will be designed for horizontal scaling.
+    -   **AI Analysis Module (FastAPI with Fine-tuned NLP Model, along with Google AI Studio):** Receives structured logs or relevant data extracts. A FastAPI application will manage batch processing for efficiency. The core will be a fine-tuned NLP model specifically trained on security-relevant log data to improve accuracy and reduce false positives/negatives. This module will be designed for horizontal scaling.
 
 ### 3. Detection & Correlation Layer
 

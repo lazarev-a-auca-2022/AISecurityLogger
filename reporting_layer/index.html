@@ -10,7 +10,75 @@
     <div class="container">
         <h1>AI Security Logger Reporting Dashboard</h1>
         <p>This is a placeholder for the reporting and presentation layer UI.</p>
-        <!-- Future UI elements for reports, alerts, and logs will go here -->
+
+        <div class="data-section">
+            <h2>Resolved Alerts</h2>
+            <ul id="alerts-list">
+                <li>Loading alerts...</li>
+            </ul>
+        </div>
+
+        <div class="data-section">
+            <h2>Normalized Logs</h2>
+            <ul id="logs-list">
+                <li>Loading logs...</li>
+            </ul>
+        </div>
     </div>
+
+    <script>
+        async function fetchAlerts() {
+            try {
+                const response = await fetch('/api/alerts');
+                const data = await response.json();
+                const alertsList = document.getElementById('alerts-list');
+                alertsList.innerHTML = ''; // Clear loading message
+
+                if (data.alerts && data.alerts.length > 0) {
+                    data.alerts.forEach(alert => {
+                        const listItem = document.createElement('li');
+                        listItem.innerHTML = `<strong>Source:</strong> ${alert.source || 'N/A'} <br> <strong>Description:</strong> ${alert.description || JSON.stringify(alert)} <br> <strong>Timestamp:</strong> ${alert.timestamp || 'N/A'}`;
+                        alertsList.appendChild(listItem);
+                    });
+                } else {
+                    alertsList.innerHTML = '<li>No resolved alerts found.</li>';
+                }
+            } catch (error) {
+                console.error('Error fetching alerts:', error);
+                document.getElementById('alerts-list').innerHTML = '<li>Error loading alerts.</li>';
+            }
+        }
+
+        async function fetchLogs() {
+            try {
+                const response = await fetch('/api/logs');
+                const data = await response.json();
+                const logsList = document.getElementById('logs-list');
+                logsList.innerHTML = ''; // Clear loading message
+
+                if (data.logs && data.logs.length > 0) {
+                    data.logs.forEach(log => {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = JSON.stringify(log);
+                        logsList.appendChild(listItem);
+                    });
+                } else {
+                    logsList.innerHTML = '<li>No normalized logs found.</li>';
+                }
+            } catch (error) {
+                console.error('Error fetching logs:', error);
+                document.getElementById('logs-list').innerHTML = '<li>Error loading logs.</li>';
+            }
+        }
+
+        // Fetch data on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchAlerts();
+            fetchLogs();
+            // Refresh data every 10 seconds
+            setInterval(fetchAlerts, 10000);
+            setInterval(fetchLogs, 10000);
+        });
+    </script>
 </body>
 </html>
