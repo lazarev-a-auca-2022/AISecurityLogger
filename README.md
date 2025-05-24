@@ -5,6 +5,9 @@
 
 This document outlines the architecture for an MVP (Minimum Viable Product) of an AI-Powered Log Processor. The system is designed to run on a server managed by FastPanel, ingesting various server and application logs. It utilizes an external NLP model via OpenRouter API for threat detection and generates concise threat/error summaries. The architecture prioritizes simplicity for MVP, with considerations for future scalability.
 
+## Disclaimer
+The program must be developed and tested in a Docker container. 
+
 ## 2. Core Goals (MVP)
 
 *   Ingest logs from configurable sources (e.g., syslog, web server logs, application logs).
