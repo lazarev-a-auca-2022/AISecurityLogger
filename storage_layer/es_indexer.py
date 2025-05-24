@@ -3,8 +3,10 @@
 from elasticsearch import Elasticsearch
 
 # Elasticsearch configuration
-ES_HOSTS = ['http://localhost:9200']  # Placeholder: Replace with your Elasticsearch host(s)
-ES_INDEX = 'logs'                     # Placeholder: Replace with your desired Elasticsearch index name
+import os
+
+ES_HOSTS = [os.getenv('ES_HOSTS', 'http://elasticsearch:9200')]
+ES_INDEX = os.getenv('ES_INDEX', 'security_events')
 
 def index_log_data(log_data):
     """

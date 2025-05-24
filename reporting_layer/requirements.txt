@@ -1,0 +1,4 @@
+fastapi
+uvicorn
+python-multipart
+elasticsearch # Add elasticsearch for fetching data

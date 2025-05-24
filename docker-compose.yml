@@ -1,0 +1,122 @@
+version: '3.8'
+
+networks:
+  security_logger_net:
+    driver: bridge
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - security_logger_net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.0.1
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    depends_on:
+      - zookeeper
+    networks:
+      - security_logger_net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.6
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false # For simplicity in development
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - security_logger_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  fluentd:
+    image: fluent/fluentd:v1.14-debian
+    container_name: fluentd
+    volumes:
+      - ./ingestion_layer/fluent.conf:/fluentd/etc/fluent.conf
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    environment:
+      FLUENTD_CONF: fluent.conf
+    depends_on:
+      - kafka
+    networks:
+      - security_logger_net
+
+  log_normalizer:
+    build: ./processing_layer
+    container_name: log_normalizer
+    environment:
+      KAFKA_BROKER_ADDRESS: ${KAFKA_BROKER_ADDRESS}
+      KAFKA_TOPIC: ${KAFKA_TOPIC}
+    depends_on:
+      - kafka
+    networks:
+      - security_logger_net
+
+  ai_analysis_module:
+    build: ./processing_layer/ai_analysis
+    container_name: ai_analysis_module
+    ports:
+      - "8000:8000"
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+    depends_on:
+      - log_normalizer # Assuming it receives data from normalizer or a SIEM
+    networks:
+      - security_logger_net
+
+  es_indexer:
+    build: ./storage_layer
+    container_name: es_indexer
+    environment:
+      ES_HOSTS: ${ES_HOSTS}
+      ES_INDEX: ${ES_INDEX}
+    depends_on:
+      - elasticsearch
+    networks:
+      - security_logger_net
+
+  reporting_layer:
+    build: ./reporting_layer
+    container_name: reporting_layer
+    ports:
+      - "8080:8000" # Map host port 8080 to container port 8000
+    environment:
+      ES_HOSTS: ${ES_HOSTS}
+      ES_INDEX: ${ES_INDEX}
+    depends_on:
+      - elasticsearch
+    networks:
+      - security_logger_net
+
+volumes:
+  esdata:

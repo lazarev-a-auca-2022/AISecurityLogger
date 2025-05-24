@@ -1,58 +1,51 @@
 from fastapi import FastAPI
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-import torch
+import google.generativeai as genai
+import os
 
 app = FastAPI()
 
-# Placeholder for pre-trained model and tokenizer
-model = None
-tokenizer = None
-device = "cpu" # Explicitly set device to CPU
+# Global variable for the generative model
+gemini_model = None
 
 @app.on_event("startup")
 async def startup_event():
     """
-    Load the pre-trained model and tokenizer on startup.
+    Configure Google AI Studio and load the generative model on startup.
     """
-    global model, tokenizer
-    model_name = "distilbert-base-uncased-finetuned-sst-2-english" # Example CPU-compatible model
+    global gemini_model
+    google_api_key = os.getenv("GOOGLE_API_KEY")
+    if not google_api_key:
+        print("GOOGLE_API_KEY environment variable not set. AI analysis will not function.")
+        return
+
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForSequenceClassification.from_pretrained(model_name)
-        model.to(device) # Move model to CPU
-        print(f"Model '{model_name}' and tokenizer loaded successfully on CPU.")
+        genai.configure(api_key=google_api_key)
+        gemini_model = genai.GenerativeModel('gemini-pro') # Or 'gemini-1.5-pro-latest' or other suitable model
+        print("Google AI Studio model loaded successfully.")
     except Exception as e:
-        print(f"Could not load model '{model_name}': {e}")
-        print("Using placeholder model and tokenizer.")
-        model = None # Ensure model is None if loading fails
-        tokenizer = None # Ensure tokenizer is None if loading fails
+        print(f"Could not configure Google AI Studio or load model: {e}")
+        gemini_model = None
 
 @app.post("/analyze_log")
 async def analyze_log(log_data: dict):
     """
-    Analyze incoming log data using the pre-trained NLP model.
+    Analyze incoming log data using the Google AI Studio model.
     """
-    if model is None or tokenizer is None:
-        print("Model or tokenizer not loaded. Cannot perform analysis.")
-        return {"analysis": "error", "message": "Model not loaded."}
+    if gemini_model is None:
+        print("Google AI Studio model not loaded. Cannot perform analysis.")
+        return {"analysis": "error", "message": "AI model not loaded or configured."}
 
-    # Convert log data to string for analysis
-    input_text = str(log_data)
+    input_text = f"Analyze the following security log for potential threats, anomalies, or important events. Provide a concise summary and categorize the event (e.g., 'Informational', 'Warning', 'Critical', 'Suspicious Activity', 'Attack Attempt'):\n\n{log_data}"
 
-    # Tokenize the input
-    inputs = tokenizer(input_text, return_tensors="pt", truncation=True, padding=True).to(device) # Move inputs to CPU
-
-    # Perform inference
-    with torch.no_grad():
-        outputs = model(**inputs)
-
-    # Get the predicted class (for sentiment analysis example)
-    # You would need to adapt this part based on the actual model used for log analysis
-    predictions = torch.argmax(outputs.logits, dim=-1)
-    analysis_result_text = "Positive" if predictions.item() == 1 else "Negative" # Example interpretation
+    try:
+        response = gemini_model.generate_content(input_text)
+        analysis_result_text = response.text
+    except Exception as e:
+        print(f"Error during AI analysis: {e}")
+        return {"analysis": "error", "message": f"AI analysis failed: {e}"}
 
     print(f"Received log data for analysis: {log_data}")
-    print(f"Analysis result: {analysis_result_text}")
+    print(f"AI Analysis result: {analysis_result_text}")
 
     analysis_result = {"analysis": analysis_result_text, "log": log_data}
     return analysis_result

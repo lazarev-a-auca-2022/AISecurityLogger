@@ -4,8 +4,10 @@ from kafka import KafkaConsumer
 import json
 
 # Kafka configuration
-KAFKA_BROKER_ADDRESS = 'KAFKA_BROKER_ADDRESS'  # Placeholder: Replace with your Kafka broker address
-KAFKA_TOPIC = 'YOUR_KAFKA_TOPIC'              # Placeholder: Replace with your Kafka topic name
+import os
+
+KAFKA_BROKER_ADDRESS = os.getenv('KAFKA_BROKER_ADDRESS', 'kafka:9092')
+KAFKA_TOPIC = os.getenv('KAFKA_TOPIC', 'security_logs')
 
 def normalize_log(log_data):
     """
