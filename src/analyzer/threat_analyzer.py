@@ -119,6 +119,24 @@ class ThreatAnalyzer:
         
         return None
     
+    async def check_processing_status(self):
+        """Check if processing is stuck and reset if necessary"""
+        # If we're stuck in processing for more than 60 seconds, reset the state
+        if hasattr(self, '_processing_start_time') and self.processing:
+            current_time = time.time()
+            if current_time - self._processing_start_time > 60:  # 60 seconds timeout
+                self.logger.warning("Processing appears to be stuck, resetting state")
+                self.processing = False
+                self._processing_start_time = None
+        
+        # If we start processing, record the start time
+        if self.processing and not hasattr(self, '_processing_start_time'):
+            self._processing_start_time = time.time()
+        
+        # If we're done processing, clear the start time
+        if not self.processing and hasattr(self, '_processing_start_time'):
+            self._processing_start_time = None
+    
     def _contains_urgent_keywords(self, log_entry: Dict[str, Any]) -> bool:
         """Check if log entry contains urgent keywords that require immediate processing"""
         urgent_keywords = ["attack", "breach", "malware", "unauthorized", "root", "sudo"]
@@ -131,6 +149,8 @@ class ThreatAnalyzer:
             return None
         
         self.processing = True
+        self._processing_start_time = time.time()  # Record start time
+        result = None
         
         try:
             # Take a batch of logs from the queue
@@ -159,9 +179,11 @@ class ThreatAnalyzer:
             self.logger.error(f"Error processing log queue: {e}")
         
         finally:
+            # Always reset processing flag when done
             self.processing = False
+            self._processing_start_time = None  # Clear processing start time
         
-        return None
+        return result
     
     def _format_log_entries(self, log_entries: List[Dict[str, Any]]) -> str:
         """Format log entries for the API prompt"""

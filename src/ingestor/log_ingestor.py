@@ -24,9 +24,15 @@ class LogFileHandler(FileSystemEventHandler):
     def on_modified(self, event):
         """Handle file modification events"""
         if not event.is_directory:
-            self.logger.debug(f"File modified: {event.src_path}")
-            # Add the file to the queue for processing
-            self.file_queue.put(event.src_path)
+            file_path = event.src_path
+            # Skip application.log, already processed files, and files already in the processed list
+            if ("application.log" not in file_path and 
+                not file_path.endswith('.old') and
+                file_path not in self.ingestor.processed_files and
+                file_path not in self.ingestor.files_to_rename):
+                self.logger.debug(f"File modified: {file_path}")
+                # Add the file to the queue for processing
+                self.file_queue.put(file_path)
 
 
 class LogIngestor:
@@ -40,6 +46,8 @@ class LogIngestor:
         self.running = False
         self.file_positions = {}  # Track file positions for tailing
         self.file_handler = LogFileHandler(self)
+        self.processed_files = set()  # Track fully processed files
+        self.files_to_rename = set()  # Files scheduled for renaming
         
         # Compile regex patterns for common log formats
         self.log_patterns = {
@@ -71,9 +79,26 @@ class LogIngestor:
                 await asyncio.sleep(self.settings.processing_interval)
                 await self._check_for_new_logs()
                 
+                # Check if the threat analyzer has completed processing
+                await self._check_threat_analyzer_status()
+                
+                # Try to rename processed files
+                await self._rename_processed_files()
+                
         except Exception as e:
             self.logger.error(f"Error in log ingestor: {e}")
             raise
+    
+    async def _check_threat_analyzer_status(self):
+        """Check if the threat analyzer has completed all pending tasks"""
+        # Check if the threat analyzer is stuck and reset if necessary
+        await self.threat_analyzer.check_processing_status()
+        
+        if not self.threat_analyzer.processing and len(self.threat_analyzer.queue) == 0:
+            # Threat analyzer is idle, safe to rename files
+            self.logger.debug("Threat analyzer is idle, safe to rename processed files")
+        else:
+            self.logger.debug(f"Threat analyzer still processing: queue={len(self.threat_analyzer.queue)}, processing={self.threat_analyzer.processing}")
     
     async def stop(self):
         """Stop the log ingestor"""
@@ -105,10 +130,20 @@ class LogIngestor:
             log_path = Path(log_source)
             
             if log_path.is_file():
-                await self._tail_file(str(log_path))
+                # Skip if it's application.log, already processed (.old extension), or in processed list
+                file_path_str = str(log_path)
+                if ("application.log" not in file_path_str and 
+                    not file_path_str.endswith('.old') and
+                    file_path_str not in self.processed_files):
+                    await self._tail_file(file_path_str)
             elif log_path.is_dir():
                 for log_file in log_path.rglob("*.log"):
-                    await self._tail_file(str(log_file))
+                    # Skip if it's application.log, already processed (.old extension), or in processed list
+                    file_path_str = str(log_file)
+                    if ("application.log" not in file_path_str and 
+                        not file_path_str.endswith('.old') and
+                        file_path_str not in self.processed_files):
+                        await self._tail_file(file_path_str)
     
     async def _tail_file(self, file_path: str, lines: int = 100):
         """Tail a file and process recent lines"""
@@ -141,6 +176,14 @@ class LogIngestor:
     async def process_file(self, file_path: str):
         """Process new content in a file"""
         try:
+            # Skip application.log and already processed files
+            if "application.log" in file_path or file_path.endswith('.old'):
+                return
+                
+            # Check if we already processed this file completely
+            if file_path in self.processed_files:
+                return
+                
             current_pos = self.file_positions.get(file_path, 0)
             
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -150,31 +193,84 @@ class LogIngestor:
                 # Update position
                 self.file_positions[file_path] = f.tell()
                 
-                # Process new lines
+                # Process new lines and collect results
+                analysis_results = []
                 for line in new_lines:
                     line = line.strip()
                     if line:
-                        await self._process_log_line(line, file_path)
+                        result = await self._process_log_line(line, file_path)
+                        if result:
+                            analysis_results.append(result)
+            
+            # Only schedule the file for renaming if we haven't done so already
+            # and we've successfully processed all lines
+            if (not file_path.endswith('.old') and 
+                "application.log" not in file_path and 
+                len(new_lines) > 0 and 
+                file_path not in self.files_to_rename):
+                self.logger.info(f"Scheduled file {file_path} for renaming after analysis completes")
+                # Add to a list of files to be renamed later
+                self._schedule_file_for_rename(file_path)
                         
         except Exception as e:
             self.logger.error(f"Error processing file {file_path}: {e}")
+            
+    def _schedule_file_for_rename(self, file_path: str):
+        """Schedule a file to be renamed after analysis is complete"""
+        self.files_to_rename.add(file_path)
+        
+    async def _rename_processed_files(self):
+        """Rename files that have been processed"""
+        if not self.files_to_rename:
+            return
+            
+        files_to_process = list(self.files_to_rename)
+        for file_path in files_to_process:
+            try:
+                # Check if the threat analyzer queue is empty and not currently processing
+                if (not self.threat_analyzer.processing and 
+                    len(self.threat_analyzer.queue) == 0):
+                    
+                    # Check if file still exists and is not already renamed
+                    old_path = Path(file_path)
+                    if old_path.exists() and not file_path.endswith('.old'):
+                        new_path = Path(f"{file_path}.old")
+                        old_path.rename(new_path)
+                        self.logger.info(f"Renamed processed file {file_path} to {new_path}")
+                        
+                        # Remove from tracked positions
+                        if file_path in self.file_positions:
+                            del self.file_positions[file_path]
+                        
+                        # Add to processed files to avoid reprocessing
+                        self.processed_files.add(file_path)
+                        
+                        # Remove from rename queue
+                        self.files_to_rename.remove(file_path)
+            except Exception as rename_error:
+                self.logger.error(f"Error renaming file {file_path}: {rename_error}")
+                # If we encounter an error, don't try to rename this file again for a while
+                self.files_to_rename.discard(file_path)
     
     async def _process_log_line(self, line: str, source_file: str):
         """Process a single log line"""
         try:
             # Check if line contains sensitive keywords
             if not self._contains_sensitive_keywords(line):
-                return
+                return None
             
             # Parse log line
             parsed_log = self._parse_log_line(line, source_file)
             
             if parsed_log:
-                # Send to threat analyzer
-                await self.threat_analyzer.analyze_log(parsed_log)
+                # Send to threat analyzer and return result
+                result = await self.threat_analyzer.analyze_log(parsed_log)
+                return result
                 
         except Exception as e:
             self.logger.error(f"Error processing log line: {e}")
+            
+        return None
     
     def _contains_sensitive_keywords(self, line: str) -> bool:
         """Check if log line contains sensitive keywords"""
@@ -254,7 +350,21 @@ class LogIngestor:
             log_path = Path(log_source)
             
             if log_path.is_file():
-                await self.process_file(str(log_path))
+                # Skip application.log, already processed files, and files scheduled for renaming
+                file_path_str = str(log_path)
+                if ("application.log" not in file_path_str and 
+                    not file_path_str.endswith('.old') and
+                    file_path_str not in self.processed_files):
+                    await self.process_file(file_path_str)
+            elif log_path.is_dir():
+                # Find new log files in directory
+                for log_file in log_path.rglob("*.log"):
+                    # Skip application.log, already processed files, and files scheduled for renaming
+                    file_path_str = str(log_file)
+                    if ("application.log" not in file_path_str and 
+                        not file_path_str.endswith('.old') and
+                        file_path_str not in self.processed_files):
+                        await self.process_file(file_path_str)
     
     async def _process_file_queue(self):
         """Process files from the queue (called from the main event loop)"""
@@ -264,7 +374,13 @@ class LogIngestor:
                 for _ in range(10):  # Process up to 10 files per cycle
                     try:
                         file_path = self.file_handler.file_queue.get_nowait()
-                        await self.process_file(file_path)
+                        
+                        # Skip if file is already processed or scheduled for renaming
+                        if (file_path not in self.processed_files and 
+                            "application.log" not in file_path and 
+                            not file_path.endswith('.old')):
+                            await self.process_file(file_path)
+                            
                         self.file_handler.file_queue.task_done()
                     except queue.Empty:
                         break
