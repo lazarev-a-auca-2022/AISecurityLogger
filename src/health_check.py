@@ -47,6 +47,9 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         """Handle health check request"""
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*') # Allow all origins for simplicity
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
         
         status = {
@@ -58,10 +61,21 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         
         self.wfile.write(json.dumps(status).encode('utf-8'))
     
+    def do_OPTIONS(self):
+        """Handle OPTIONS requests for CORS preflight"""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
     def _handle_metrics(self):
         """Handle metrics request"""
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*') # Allow all origins for simplicity
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
         
         # Add more metrics as needed
@@ -111,6 +125,9 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*') # Allow all origins for simplicity
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
             self.end_headers()
             response = {'status': 'success', 'message': 'Log generation initiated.'}
             self.wfile.write(json.dumps(response).encode('utf-8'))
