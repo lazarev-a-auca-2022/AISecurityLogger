@@ -160,10 +160,10 @@ def test_do_get(mock_handler):
 def test_health_check_server_init():
     """Test HealthCheckServer initialization"""
     app_status = {'test': 'status'}
-    server = HealthCheckServer(host='127.0.0.1', port=8080, app_status=app_status)
+    server = HealthCheckServer(host='127.0.0.1', port=5356, app_status=app_status)
     
     assert server.host == '127.0.0.1'
-    assert server.port == 8080
+    assert server.port == 5356
     assert server.app_status == app_status
 
 

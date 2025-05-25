@@ -163,7 +163,7 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 class HealthCheckServer:
     """HTTP server for health checks"""
     
-    def __init__(self, host='0.0.0.0', port=8080, app_status=None):
+    def __init__(self, host='0.0.0.0', port=5356, app_status=None):
         self.host = host
         self.port = port
         self.app_status = app_status or {}

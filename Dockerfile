@@ -36,7 +36,7 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Expose port for potential web interface
-EXPOSE 8080
+EXPOSE 5356
 
 # Default entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"]
