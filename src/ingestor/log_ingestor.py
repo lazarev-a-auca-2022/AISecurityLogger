@@ -21,6 +21,17 @@ class LogFileHandler(FileSystemEventHandler):
         self.logger = logging.getLogger(__name__)
         self.file_queue = queue.Queue()
     
+    def on_created(self, event):
+        """Handle file creation events"""
+        if not event.is_directory:
+            file_path = event.src_path
+            # Skip application.log and files already in the processed list
+            if ("application.log" not in file_path and 
+                file_path not in self.ingestor.processed_files and
+                file_path not in self.ingestor.files_to_rename):
+                self.logger.debug(f"File created: {file_path}")
+                self.file_queue.put(file_path)
+
     def on_modified(self, event):
         """Handle file modification events"""
         if not event.is_directory:
@@ -47,7 +58,8 @@ class LogIngestor:
         self.file_positions = {}  # Track file positions for tailing
         self.file_handler = LogFileHandler(self)
         self.processed_files = set()  # Track fully processed files
-        self.files_to_rename = set()  # Files scheduled for renaming
+        self.files_to_rename = {}  # Files scheduled for renaming: {file_path: attempt_count}
+        self.MAX_RENAME_ATTEMPTS = 3 # Max attempts to rename a file
         
         # Compile regex patterns for common log formats
         self.log_patterns = {
@@ -217,40 +229,72 @@ class LogIngestor:
             
     def _schedule_file_for_rename(self, file_path: str):
         """Schedule a file to be renamed after analysis is complete"""
-        self.files_to_rename.add(file_path)
-        
+        if file_path not in self.files_to_rename:
+            self.files_to_rename[file_path] = 0 # Initialize attempt count
+
     async def _rename_processed_files(self):
         """Rename files that have been processed"""
         if not self.files_to_rename:
             return
             
-        files_to_process = list(self.files_to_rename)
+        # Create a list of files to process to avoid modifying dict during iteration
+        files_to_process = list(self.files_to_rename.keys())
         for file_path in files_to_process:
-            try:
-                # Check if the threat analyzer queue is empty and not currently processing
-                if (not self.threat_analyzer.processing and 
-                    len(self.threat_analyzer.queue) == 0):
+            # Only attempt rename if threat analyzer is idle
+            if (not self.threat_analyzer.processing and 
+                len(self.threat_analyzer.queue) == 0):
+                
+                old_path = Path(file_path)
+                new_path = Path(f"{file_path}.old")
+                
+                # Check if file still exists and is not already renamed
+                if not old_path.exists() or file_path.endswith('.old'):
+                    self.logger.debug(f"File {file_path} no longer exists or already renamed. Removing from rename queue.")
+                    self.files_to_rename.pop(file_path, None)
+                    self.processed_files.add(file_path) # Ensure it's marked as processed
+                    continue
+
+                try:
+                    # If the new path already exists, try to remove it first
+                    if new_path.exists():
+                        self.logger.warning(f"Target rename path {new_path} already exists. Attempting to remove.")
+                        try:
+                            new_path.unlink() # Remove the existing .old file
+                        except Exception as unlink_error:
+                            self.logger.error(f"Failed to remove existing target file {new_path}: {unlink_error}")
+                            # If we can't remove the target, we can't rename. Increment attempts and continue.
+                            self.files_to_rename[file_path] += 1
+                            if self.files_to_rename[file_path] >= self.MAX_RENAME_ATTEMPTS:
+                                self.logger.critical(f"Max rename attempts reached for {file_path}. Failed to remove existing target. Marking as processed.")
+                                self.processed_files.add(file_path)
+                                self.files_to_rename.pop(file_path, None)
+                            continue # Skip rename attempt if unlink failed
+
+                    old_path.rename(new_path)
+                    self.logger.info(f"Renamed processed file {file_path} to {new_path}")
                     
-                    # Check if file still exists and is not already renamed
-                    old_path = Path(file_path)
-                    if old_path.exists() and not file_path.endswith('.old'):
-                        new_path = Path(f"{file_path}.old")
-                        old_path.rename(new_path)
-                        self.logger.info(f"Renamed processed file {file_path} to {new_path}")
-                        
-                        # Remove from tracked positions
-                        if file_path in self.file_positions:
-                            del self.file_positions[file_path]
-                        
-                        # Add to processed files to avoid reprocessing
+                    # Remove from tracked positions
+                    if file_path in self.file_positions:
+                        del self.file_positions[file_path]
+                    
+                    # Add to processed files to avoid reprocessing
+                    self.processed_files.add(file_path)
+                    
+                    # Remove from rename queue
+                    self.files_to_rename.pop(file_path, None)
+
+                except Exception as rename_error:
+                    self.files_to_rename[file_path] += 1
+                    if self.files_to_rename[file_path] < self.MAX_RENAME_ATTEMPTS:
+                        self.logger.warning(f"Error renaming file {file_path}: {rename_error}. Retrying (attempt {self.files_to_rename[file_path]}/{self.MAX_RENAME_ATTEMPTS}).")
+                    else:
+                        self.logger.critical(f"Max rename attempts reached for {file_path}: {rename_error}. Marking as processed to prevent re-processing.")
+                        # Even if renaming fails after max attempts, mark as processed to prevent re-processing
                         self.processed_files.add(file_path)
-                        
                         # Remove from rename queue
-                        self.files_to_rename.remove(file_path)
-            except Exception as rename_error:
-                self.logger.error(f"Error renaming file {file_path}: {rename_error}")
-                # If we encounter an error, don't try to rename this file again for a while
-                self.files_to_rename.discard(file_path)
+                        self.files_to_rename.pop(file_path, None)
+            else:
+                self.logger.debug(f"Skipping rename for {file_path}: Threat analyzer busy.")
     
     async def _process_log_line(self, line: str, source_file: str):
         """Process a single log line"""
