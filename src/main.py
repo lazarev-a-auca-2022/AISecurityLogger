@@ -76,6 +76,12 @@ class AISecurityLogger:
             signal.signal(signal.SIGINT, self._signal_handler)
             signal.signal(signal.SIGTERM, self._signal_handler)
             
+            # Check if log directories exist and create them if needed
+            self._ensure_log_directories()
+            
+            # Check if we have log sources and verify they exist
+            log_sources_exist = await self._check_log_sources()
+            
             # Ensure latest_report.html link is properly set up
             await self._ensure_latest_report_link()
             
@@ -101,6 +107,48 @@ class AISecurityLogger:
         except Exception as e:
             self.logger.error(f"Error starting AI Security Logger: {e}")
             raise
+            
+    def _ensure_log_directories(self):
+        """Ensure that log directories exist"""
+        # Ensure the logs directory exists
+        log_dir = Path(self.settings.log_sources[0]) if self.settings.log_sources else Path("/app/data/logs")
+        if log_dir.is_dir():
+            # It's already a directory
+            pass
+        else:
+            # It's either a file path or doesn't exist
+            log_dir = log_dir.parent
+        
+        log_dir.mkdir(parents=True, exist_ok=True)
+        self.logger.info(f"Ensured log directory exists: {log_dir}")
+            
+    async def _check_log_sources(self):
+        """Check if log sources exist and contain valid log files"""
+        log_sources_exist = False
+        for log_source in self.settings.log_sources:
+            log_path = Path(log_source)
+            if log_path.exists():
+                if log_path.is_dir():
+                    # Check if directory contains any log files
+                    log_files = list(log_path.glob("*.log"))
+                    if log_files:
+                        log_sources_exist = True
+                        self.logger.info(f"Found log files in {log_path}: {len(log_files)} files")
+                        for log_file in log_files[:5]:  # List up to 5 log files
+                            self.logger.debug(f"Log file: {log_file}")
+                    else:
+                        self.logger.warning(f"Log directory exists but contains no log files: {log_path}")
+                else:
+                    # It's a file and it exists
+                    log_sources_exist = True
+                    self.logger.info(f"Found log file: {log_path}")
+            else:
+                self.logger.warning(f"Log source does not exist: {log_path}")
+                
+        if not log_sources_exist:
+            self.logger.warning("No valid log sources found. System will wait for logs to be created.")
+            
+        return log_sources_exist
     
     async def stop(self):
         """Stop the AI Security Logger"""
@@ -143,6 +191,25 @@ class AISecurityLogger:
         self.logger.info("Checking latest_report.html link...")
         report_dir = Path(self.settings.output_log_dir)
         latest_link = report_dir / "latest_report.html"
+        
+        # First check if we have any log files to process
+        log_sources_exist = False
+        for log_source in self.settings.log_sources:
+            log_path = Path(log_source)
+            if log_path.exists():
+                if log_path.is_dir():
+                    # Check if directory contains any log files
+                    log_files = list(log_path.glob("*.log"))
+                    if log_files:
+                        log_sources_exist = True
+                        break
+                else:
+                    # It's a file and it exists
+                    log_sources_exist = True
+                    break
+        
+        if not log_sources_exist:
+            self.logger.warning("No log sources found. Reports will be generated only when logs are available.")
         
         # Check if the link exists and points to a valid file
         valid_link = False

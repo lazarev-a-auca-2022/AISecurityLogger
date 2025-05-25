@@ -35,7 +35,6 @@ logs/
 # Reports
 reports/*.html
 !reports/index.html
-!reports/latest_report.html
 reports/*.json
 
 # Virtual Environment

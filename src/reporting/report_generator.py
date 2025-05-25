@@ -117,6 +117,16 @@ class ReportGenerator:
                 end_time=end_time
             )
             
+            # Check if there are any threats to report on
+            # Skip report generation if there are no threats and this is not a forced report
+            if not threats and not force:
+                self.logger.info("No threats found for this time period. Skipping report generation.")
+                return ""
+                
+            # If it's a forced report and there are no threats, log a warning
+            if not threats and force:
+                self.logger.warning("Generating a report with no threats because force=True")
+            
             # Generate the report
             if output_format.lower() == 'json':
                 report_content = self._generate_json_report(threats, start_time, end_time)
@@ -350,7 +360,19 @@ class ReportGenerator:
     def _generate_threats_html(self, threats: List[Dict[str, Any]]) -> str:
         """Generate HTML for the threats section"""
         if not threats:
-            return '<div class="empty-message">No threats detected during this period.</div>'
+            empty_message = """
+    <div class="empty-message">
+        <p>No threats detected during this period.</p>
+        <p>This could be because:</p>
+        <ul>
+            <li>No logs were processed during this period</li>
+            <li>No security threats were detected in the processed logs</li>
+            <li>The logs directory is empty or inaccessible</li>
+        </ul>
+        <p>Check the log sources to ensure logs are being properly collected.</p>
+    </div>
+"""
+            return empty_message
             
         threats_html = ""
         
