@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Security Logger - Reports</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .btn {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .reports-list {
+            list-style: none;
+            padding: 0;
+        }
+        .reports-list li {
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+        }
+        .reports-list a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .reports-list a:hover {
+            text-decoration: underline;
+        }
+        .report-timestamp {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.9em;
+            border-top: 1px solid #ecf0f1;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Security Logger - Reports</h1>
+        
+        <div class="card">
+            <h2>Quick Access</h2>
+            <p>View the latest security report or check system health.</p>
+            <a href="latest_report.html" id="latestReportLink" class="btn">Latest Report</a>
+            <a href="localhost:8081/health" class="btn">System Health</a>
+            <a href="/metrics" class="btn">System Metrics</a>
+        </div>
+        
+        <div class="card">
+            <h2>All Reports</h2>
+            <p>Click on a report to view details:</p>
+            
+            <ul class="reports-list" id="reportsList">
+                <li>Loading reports...</li>
+            </ul>
+        </div>
+        
+        <footer>
+            <p>AI Security Logger v1.0 - Powered by OpenRouter API</p>
+            <p>Built for FastPanel Server Management</p>
+        </footer>
+    </div>
+
+    <script>
+        // Simple script to load and display report files
+        document.addEventListener('DOMContentLoaded', function() {
+            const reportsList = document.getElementById('reportsList');
+            
+            // Fetch directory listing
+            fetch('/')
+                .then(response => response.text())
+                .then(html => {
+                    // Extract links to HTML and JSON reports
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const links = Array.from(doc.querySelectorAll('a'));
+                    
+                    // Filter for report files
+                    const reportLinks = links.filter(link => {
+                        const href = link.getAttribute('href');
+                        return href && (
+                            href.includes('security_report') && 
+                            (href.endsWith('.html') || href.endsWith('.json'))
+                        );
+                    });
+                    
+                    // Sort by name (newest first)
+                    reportLinks.sort((a, b) => {
+                        return b.getAttribute('href').localeCompare(a.getAttribute('href'));
+                    });
+                    
+                    // Display reports or show message if none found
+                    if (reportLinks.length > 0) {
+                        reportsList.innerHTML = '';
+                        reportLinks.forEach(link => {
+                            const href = link.getAttribute('href');
+                            const timestamp = href.match(/(\d{8}_\d{6})/);
+                            const dateStr = timestamp ? formatTimestamp(timestamp[1]) : '';
+                            
+                            const li = document.createElement('li');
+                            li.innerHTML = `
+                                <a href="${href}">${href}</a>
+                                <span class="report-timestamp">${dateStr}</span>
+                            `;
+                            reportsList.appendChild(li);
+                        });
+                    } else {
+                        reportsList.innerHTML = '<li>No reports found. Reports will appear here once generated.</li>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading reports:', error);
+                    reportsList.innerHTML = '<li>Error loading reports. Please try again later.</li>';
+                });
+        });
+        
+        // Format timestamp from filename (YYYYMMDD_HHMMSS)
+        function formatTimestamp(timestamp) {
+            if (!timestamp || timestamp.length !== 15) return '';
+            
+            const year = timestamp.substring(0, 4);
+            const month = timestamp.substring(4, 6);
+            const day = timestamp.substring(6, 8);
+            const hour = timestamp.substring(9, 11);
+            const minute = timestamp.substring(11, 13);
+            const second = timestamp.substring(13, 15);
+            
+            return `(${year}-${month}-${day} ${hour}:${minute}:${second})`;
+        }
+    </script>
+</body>
+</html>
