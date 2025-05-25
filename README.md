@@ -1,153 +1,104 @@
-      
-# AI-Powered Log Processor - Architecture (MVP)
+# AI-Powered Security Log Processor
 
-## 1. Overview
+An AI-powered log analysis system that monitors server logs for potential security threats and generates summaries using OpenRouter's API.
 
-This document outlines the architecture for an MVP (Minimum Viable Product) of an AI-Powered Log Processor. The system is designed to run on a server managed by FastPanel, ingesting various server and application logs. It utilizes an external NLP model via OpenRouter API for threat detection and generates concise threat/error summaries. The architecture prioritizes simplicity for MVP, with considerations for future scalability.
+## Features
 
-## Disclaimer
-The program must be developed and tested in a Docker container. 
+- Ingests logs from various sources (syslog, web server logs, application logs)
+- Pre-processes and normalizes log entries
+- Uses OpenRouter's AI models to analyze logs for security threats
+- Stores detected threats and their summaries in a SQLite database
+- Generates HTML and JSON reports of detected threats
+- Runs in Docker for easy deployment and management
 
-## 2. Core Goals (MVP)
+## Architecture
 
-*   Ingest logs from configurable sources (e.g., syslog, web server logs, application logs).
-*   Pre-process and normalize log entries.
-*   Send relevant log snippets/patterns to an OpenRouter NLP model for analysis.
-*   Receive and interpret the NLP model's threat assessment.
-*   Store detected threats and their summaries.
-*   Provide a simple mechanism to view these summaries (e.g., a daily digest file or a simple DB query).
-*   Ensure secure handling of the OpenRouter API key.
-*   Be deployable and manageable within a FastPanel environment.
+The system consists of the following components:
 
-## 3. Architecture Diagram (Conceptual)
+1. **Log Ingestor**: Monitors configured log files/directories for new entries
+2. **Threat Analyzer**: Sends logs to OpenRouter's AI model and processes responses
+3. **Database**: Stores detected threats and their summaries
+4. **Report Generator**: Creates periodic reports of detected threats
 
-    
-+---------------------+ +---------------------+ +-----------------------+
-| Log Sources |----->| Log Ingestor & |----->| AI Threat Analyzer |
-| (e.g., syslog, | | Preprocessor | | (Python Service) |
-| Nginx, App Logs) | | (Python Script/ | | - Formats request |
-+---------------------+ | Service) | | - Calls OpenRouter API|
-| - Watches files/dirs| | - Parses response |
-| - Basic parsing | +-----------+-----------+
-| - Filtering | |
-+---------+-----------+ | (Threat Summary)
-| |
-|(Filtered/Normalized Logs) |
-| |
-v v
-+---------------------+ +-----------------------+
-| Log & Threat Storage|----->| Summary Access Point |
-| (SQLite DB / | | (e.g., Cron-generated |
-| JSON Log Files) | | Report, Simple CLI) |
-+---------------------+ +-----------------------+
+## Quick Start
 
-+-----------------------------+
-| Configuration |
-| (config.ini / .env file) |
-| - Log paths |
-| - OpenRouter API Key |
-| - NLP Model ID |
-| - Detection Thresholds |
-+-----------------------------+
+### Prerequisites
 
-## 4. Components
+- Docker and Docker Compose
+- OpenRouter API key (get one from [OpenRouter](https://openrouter.ai))
 
-### 4.1. Log Sources
-*   **Description:** Standard system and application logs.
-    *   System Logs (e.g., `/var/log/syslog`, `/var/log/auth.log`)
-    *   Web Server Logs (e.g., Nginx `access.log`, `error.log` managed by FastPanel)
-    *   Application Logs (custom application log files)
-*   **Integration:** The processor will need read access to these files/streams.
+### Setup
 
-### 4.2. Configuration
-*   **Description:** A central place for all settings.
-*   **Technology:** `.env` file (using `python-dotenv`) or `config.ini` (using `configparser`).
-*   **Contents (MVP):**
-    *   `OPENROUTER_API_KEY`
-    *   `OPENROUTER_MODEL_ID` (e.g., "openai/gpt-3.5-turbo-instruct" or a free tier model)
-    *   `LOG_SOURCES`: A list of files or directories to monitor.
-    *   `PROCESSING_INTERVAL`: How often to check for new logs.
-    *   `SENSITIVITY_KEYWORDS`: Simple keywords to pre-filter logs before sending to AI (e.g., "error", "failed", "denied", "warning", "critical").
-    *   `DB_PATH` (if using SQLite) or `OUTPUT_LOG_DIR`.
+1. Clone this repository:
 
-### 4.3. Log Ingestor & Preprocessor
-*   **Description:** A service or script responsible for collecting, tailing, and performing initial processing of log entries.
-*   **Technology:** Python script/service (e.g., using libraries like `watchdog` for file monitoring or simply `tail -f` piped to script).
-*   **Responsibilities:**
-    1.  Monitor configured log files/directories for new entries.
-    2.  Perform basic parsing (e.g., timestamp extraction, regex for common formats if possible).
-    3.  Filter logs based on `SENSITIVITY_KEYWORDS` or basic heuristics to reduce noise and API calls.
-    4.  Queue or directly pass relevant log entries to the AI Threat Analyzer.
-*   **Scalability Note:** For MVP, this can be a single Python script. For scaling, this could involve a dedicated log shipper (like Filebeat) sending to a message queue (like Redis or RabbitMQ) which the preprocessor consumes.
+```bash
+git clone https://github.com/yourusername/AISecurityLogger.git
+cd AISecurityLogger
+```
 
-### 4.4. AI Threat Analyzer
-*   **Description:** The core component that interacts with the OpenRouter NLP model.
-*   **Technology:** Python service/module (using `requests` library for API calls).
-*   **Responsibilities:**
-    1.  Receive pre-processed log entries.
-    2.  Construct a suitable prompt for the OpenRouter NLP model. The prompt should instruct the model to:
-        *   Analyze the provided log snippet(s) for potential security threats, errors, or anomalies.
-        *   Provide a concise summary of the findings.
-        *   Categorize the severity (e.g., INFO, WARNING, ERROR, CRITICAL).
-        *   Example Prompt: `"Analyze the following log entries for security threats or critical errors. Summarize any findings concisely and indicate severity (INFO, WARNING, ERROR, CRITICAL):\n\n[LOG_ENTRY_1]\n[LOG_ENTRY_2]..."`
-    3.  Make an API call to OpenRouter using the configured API key and model.
-    4.  Parse the JSON response from OpenRouter.
-    5.  Extract the threat summary and severity.
-    6.  Pass the enriched information (original log, AI summary, severity) to Log & Threat Storage.
-*   **Security:** The OpenRouter API key must be read from the secure configuration and not hardcoded.
+2. Run the setup script to create the .env file:
 
-### 4.5. Log & Threat Storage
-*   **Description:** Stores both the original (or pre-processed) logs that triggered an alert and the AI-generated threat summaries.
-*   **Technology (MVP):**
-    *   **SQLite Database:** Simple, file-based, easy to set up. Schema: `(timestamp, source_log, original_log_entry, ai_summary, severity, processed_at)`.
-    *   **Alternatively (simpler MVP):** Structured JSON log files appended to a daily/hourly file.
-*   **Scalability Note:** For future scaling, this would migrate to a more robust database like PostgreSQL or a specialized log database.
+```bash
+./run.sh setup
+```
 
-### 4.6. Summary Access Point
-*   **Description:** A way for the user/admin to view the detected threats and summaries.
-*   **Technology (MVP):**
-    *   **Cron Job + Script:** A Python script run by cron (e.g., daily) that queries the SQLite DB (or parses JSON logs) and generates a simple text report (e.g., emailed or saved to a file in a FastPanel-accessible web directory).
-    *   **Simple CLI Tool:** A command-line interface to query recent threats.
-*   **FastPanel Integration:** The output report could be placed in a directory served by Nginx/Apache, making it viewable via a browser.
+3. Edit the .env file to add your OpenRouter API key and configure log sources:
 
-## 5. Data Flow
+```bash
+nano .env
+```
 
-1.  **Log Generation:** System services, web servers, and applications generate logs.
-2.  **Ingestion & Pre-processing:** The `Log Ingestor & Preprocessor` tails/reads these logs. It applies basic filters (keywords, regex) and normalization.
-3.  **AI Analysis Trigger:** If a log entry passes pre-processing filters, it's sent to the `AI Threat Analyzer`.
-4.  **OpenRouter API Call:** The `AI Threat Analyzer` formats a prompt with the log data and sends it to the configured OpenRouter NLP model.
-5.  **AI Response:** OpenRouter processes the request and returns a JSON response containing the analysis (threat summary, severity).
-6.  **Storage:** The `AI Threat Analyzer` parses this response and stores the original log snippet, AI summary, and severity in the `Log & Threat Storage` (SQLite DB or JSON files).
-7.  **Reporting:** The `Summary Access Point` (e.g., daily cron job) queries the storage and generates a human-readable summary/report.
+4. Start the application:
 
-## 6. FastPanel Integration
+```bash
+./run.sh start
+```
 
-*   **Deployment:** The Python application (Ingestor, Analyzer) will run as a systemd service or a supervised script. FastPanel's interface might not directly manage Python apps, but server access (SSH, file manager) allows setup.
-*   **Log Access:** FastPanel configures web servers (Nginx/Apache), so their log paths are known and can be configured in the processor.
-*   **Configuration Management:** Config files (`.env` or `config.ini`) can be managed via FastPanel's file editor or SSH.
-*   **Resource Monitoring:** FastPanel's server monitoring can help observe the resource usage of the processor.
-*   **Report Access (Optional):** If reports are generated as HTML/text files, they can be placed in a web-accessible directory configured via FastPanel.
-*   **Firewall:** Ensure outbound connections to `openrouter.ai` are allowed if a firewall is active.
+### Usage
 
-## 7. Scalability Considerations (Beyond MVP)
+- View logs: `./run.sh logs`
+- Check status: `./run.sh status`
+- Access reports: Open http://localhost:8080/reports/ in your browser
+- Stop the application: `./run.sh stop`
+- Rebuild containers: `./run.sh rebuild`
 
-*   **Message Queue:** Introduce a message queue (e.g., Redis, RabbitMQ) between the `Log Ingestor` and `AI Threat Analyzer` to decouple components and handle bursts of logs.
-*   **Dedicated Workers:** Scale the `AI Threat Analyzer` component by running multiple instances (workers) consuming from the message queue.
-*   **Database:** Migrate from SQLite to a more robust database like PostgreSQL for better concurrency and data management.
-*   **Advanced Pre-processing:** Implement more sophisticated pre-filtering and log parsing before sending to the AI to reduce costs and improve AI focus.
-*   **Rate Limiting & Retries:** Implement robust rate limiting and retry mechanisms for OpenRouter API calls.
-*   **Web UI:** Develop a simple web interface (e.g., using Flask/FastAPI) for configuration, viewing dashboards, and managing threats, potentially hosted via FastPanel.
+## Configuration
 
-## 8. Technology Stack (MVP Summary)
+Configuration is done through the `.env` file. The following options are available:
 
-*   **Language:** Python 3.x
-*   **Key Python Libraries:**
-    *   `requests` (for OpenRouter API)
-    *   `python-dotenv` or `configparser` (for configuration)
-    *   `sqlite3` (for database)
-    *   `watchdog` (optional, for efficient file monitoring)
-    *   Standard library modules (`os`, `re`, `json`, `datetime`)
-*   **External Services:** OpenRouter API
-*   **Storage:** SQLite / Flat Files (JSON)
-*   **Deployment Environment:** Linux server managed by FastPanel.
-*   **Process Management:** `systemd` service or a simple supervisor script.
+- `OPENROUTER_API_KEY`: Your OpenRouter API key
+- `OPENROUTER_MODEL_ID`: The model to use (default: "openai/gpt-3.5-turbo")
+- `LOG_SOURCES`: Comma-separated list of files or directories to monitor
+- `PROCESSING_INTERVAL`: How often to check for new logs (in seconds)
+- `SENSITIVITY_KEYWORDS`: Keywords to pre-filter logs
+- `DB_PATH`: Path to the SQLite database
+- `OUTPUT_LOG_DIR`: Directory for reports
+- `REPORT_SCHEDULE`: How often to generate reports (hourly, daily, weekly)
+
+## Testing
+
+You can generate test logs to verify the system works:
+
+```bash
+./tools/generate_test_logs.py --num-logs 20 --interval 0.5
+```
+
+The logs will be written to `data/logs/sample.log` by default.
+
+## Docker Compose Services
+
+The application runs with three containers:
+
+1. **ai-security-logger**: The main application
+2. **redis**: For message queueing
+3. **nginx**: A simple web server to view reports
+
+
+## License
+
+MIT License
+
+## Acknowledgments
+
+- This project uses the OpenRouter API for AI analysis
+- Built for use with FastPanel server management

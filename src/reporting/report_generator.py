@@ -152,8 +152,24 @@ class ReportGenerator:
             try:
                 if os.path.exists(latest_path):
                     os.remove(latest_path)
-                os.symlink(report_path, latest_path)
-            except OSError:
+                # Use the absolute path but from the same directory for the symlink target
+                report_filename = os.path.basename(report_path)
+                report_dir = os.path.dirname(latest_path)
+                target_path = os.path.join(report_dir, report_filename)
+                os.symlink(report_filename, latest_path)  # Use relative path for symlink
+                self.logger.info(f"Created symlink: {latest_path} -> {report_filename}")
+                
+                # Verify the link was created successfully and points to the right file
+                if os.path.islink(latest_path):
+                    link_target = os.readlink(latest_path)
+                    if not os.path.exists(os.path.join(report_dir, link_target)):
+                        self.logger.warning(f"Symlink target does not exist: {link_target}")
+                        # As a fallback, create a copy
+                        with open(latest_path, 'w', encoding='utf-8') as f:
+                            f.write(report_content)
+                            self.logger.info(f"Created copy instead of symlink for latest_report.{file_ext}")
+            except OSError as e:
+                self.logger.warning(f"Could not create symlink, creating copy instead: {e}")
                 # Symlinks might not be supported, create a copy instead
                 with open(latest_path, 'w', encoding='utf-8') as f:
                     f.write(report_content)

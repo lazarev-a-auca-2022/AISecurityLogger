@@ -76,6 +76,9 @@ class AISecurityLogger:
             signal.signal(signal.SIGINT, self._signal_handler)
             signal.signal(signal.SIGTERM, self._signal_handler)
             
+            # Ensure latest_report.html link is properly set up
+            await self._ensure_latest_report_link()
+            
             self.running = True
             
             # Start health check server
@@ -131,6 +134,65 @@ class AISecurityLogger:
         """Handle shutdown signals"""
         self.logger.info(f"Received signal {signum}, initiating shutdown...")
         asyncio.create_task(self.stop())
+        
+    async def _ensure_latest_report_link(self):
+        """Ensure that the latest_report.html link is properly set up"""
+        import glob
+        import subprocess
+        
+        self.logger.info("Checking latest_report.html link...")
+        report_dir = Path(self.settings.output_log_dir)
+        latest_link = report_dir / "latest_report.html"
+        
+        # Check if the link exists and points to a valid file
+        valid_link = False
+        
+        if latest_link.exists():
+            if latest_link.is_symlink():
+                target_path = os.readlink(str(latest_link))
+                target_file = report_dir / target_path if not os.path.isabs(target_path) else Path(target_path)
+                
+                valid_link = target_file.exists()
+                if not valid_link:
+                    self.logger.warning(f"Latest report link points to non-existent file: {target_path}")
+            else:
+                # If it's a regular file, it should be fine
+                valid_link = True
+        else:
+            self.logger.warning("Latest report link does not exist")
+        
+        # If the link is invalid or doesn't exist, try to fix it
+        if not valid_link:
+            # Find the most recent report
+            reports = glob.glob(str(report_dir / "security_report_*.html"))
+            
+            if reports:
+                reports.sort(reverse=True)
+                newest_report = Path(reports[0])
+                
+                try:
+                    # Remove existing link if it exists
+                    if latest_link.exists():
+                        os.remove(str(latest_link))
+                    
+                    # Create a new symlink using relative path
+                    os.chdir(str(report_dir))
+                    os.symlink(newest_report.name, "latest_report.html")
+                    
+                    self.logger.info(f"Fixed latest_report.html link to point to {newest_report.name}")
+                except Exception as e:
+                    self.logger.error(f"Failed to create latest_report.html link: {e}")
+                    
+                    # Try using the script as a fallback
+                    try:
+                        script_path = Path(__file__).parent.parent / "update_latest_report.sh"
+                        if script_path.exists():
+                            self.logger.info("Attempting to fix link using update_latest_report.sh script")
+                            subprocess.run([str(script_path)], check=True)
+                    except Exception as script_error:
+                        self.logger.error(f"Failed to run update script: {script_error}")
+            else:
+                self.logger.warning("No security reports found to create latest_report.html link")
 
 
 async def main():
