@@ -9,6 +9,7 @@ import logging
 import os
 import time
 from pathlib import Path
+import re
 from typing import Dict, Any, List, Optional
 
 
@@ -103,9 +104,9 @@ class ReportGenerator:
                 else:
                     time_range = 24 * 60 * 60  # Default to daily
             
-            # Calculate time range - Use a wider range to ensure we catch all threats
+            # Calculate time range
             end_time = datetime.datetime.now().timestamp()
-            start_time = end_time - (time_range * 3)  # Multiply by 3 to extend the window
+            start_time = end_time - time_range
             
             self.logger.debug(f"Retrieving threats from {datetime.datetime.fromtimestamp(start_time)} to {datetime.datetime.fromtimestamp(end_time)}")
             
@@ -174,6 +175,9 @@ class ReportGenerator:
                 with open(latest_path, 'w', encoding='utf-8') as f:
                     f.write(report_content)
             
+            # After generating and saving the report, update the reports.json file
+            await self._update_reports_json()
+
             return report_path
             
         except Exception as e:
@@ -412,3 +416,30 @@ class ReportGenerator:
             counts[severity] = counts.get(severity, 0) + 1
         
         return counts
+
+    async def _update_reports_json(self):
+        """Generate and save a JSON file with a list of all security reports."""
+        self.logger.info("Updating reports.json...")
+        reports_dir = Path(self.settings.output_log_dir)
+        report_files = []
+
+        for f in reports_dir.iterdir():
+            if f.is_file() and f.name.startswith("security_report_") and (f.suffix == ".html" or f.suffix == ".json"):
+                timestamp_match = re.search(r'(\d{8}_\d{6})', f.name)
+                timestamp = timestamp_match.group(1) if timestamp_match else "unknown"
+                report_files.append({
+                    "name": f.name,
+                    "path": f.name,  # Path relative to the reports directory
+                    "timestamp": timestamp
+                })
+        
+        # Sort reports by timestamp, newest first
+        report_files.sort(key=lambda x: x['timestamp'], reverse=True)
+
+        reports_json_path = reports_dir / "reports.json"
+        try:
+            with open(reports_json_path, 'w', encoding='utf-8') as f:
+                json.dump(report_files, f, indent=2)
+            self.logger.info(f"Successfully updated {reports_json_path}")
+        except Exception as e:
+            self.logger.error(f"Error writing reports.json: {e}")

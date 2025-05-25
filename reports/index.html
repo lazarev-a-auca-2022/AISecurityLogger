@@ -77,8 +77,9 @@
             <h2>Quick Access</h2>
             <p>View the latest security report or check system health.</p>
             <a href="latest_report.html" id="latestReportLink" class="btn">Latest Report</a>
-            <a href="localhost:8081/health" class="btn">System Health</a>
-            <a href="/metrics" class="btn">System Metrics</a>
+            <a href="http://localhost:8081/health" class="btn">System Health</a>
+            <a href="http://localhost:8081/metrics" class="btn">System Metrics</a>
+            <button id="generateCustomReportBtn" class="btn">Generate Custom Report</button>
         </div>
         
         <div class="card">
@@ -100,41 +101,77 @@
         // Simple script to load and display report files
         document.addEventListener('DOMContentLoaded', function() {
             const reportsList = document.getElementById('reportsList');
+            const generateCustomReportBtn = document.getElementById('generateCustomReportBtn');
+
+            const appTypes = ["generic", "apache", "nginx", "wordpress"]; // Must match APP_LOG_PATTERNS keys in Python script
+
+            generateCustomReportBtn.addEventListener('click', function() {
+                let appType = prompt(`Enter App Type (${appTypes.join(', ')}):`, "generic");
+                if (!appType) return;
+                appType = appType.toLowerCase();
+                if (!appTypes.includes(appType)) {
+                    alert(`Invalid app type. Please choose from: ${appTypes.join(', ')}`);
+                    return;
+                }
+
+                const numLogs = prompt("Enter Number of Logs (default: 10):", "10");
+                if (numLogs === null) return;
+                const interval = prompt("Enter Interval in Seconds (default: 1.0):", "1.0");
+                if (interval === null) return;
+                const includeSecurity = confirm("Include Security Logs? (OK for Yes, Cancel for No)");
+
+                const logFileName = `${appType}_sample.log`; // Suggest a log file name based on app type
+
+                fetch('http://localhost:8080/generate_logs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        num_logs: parseInt(numLogs),
+                        interval: parseFloat(interval),
+                        include_security: includeSecurity,
+                        app_type: appType,
+                        log_file_name: logFileName // Pass the suggested file name
+                    }),
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    alert(`Log generation: ${data.status}. ${data.message}\n\nRefresh this page in a few moments to see the new report.`);
+                    // Optionally, refresh the reports list after a delay
+                    // setTimeout(() => location.reload(), 3000); 
+                })
+                .catch(error => {
+                    console.error('Error initiating log generation:', error);
+                    alert(`Error initiating log generation: ${error.message}`);
+                });
+            });
             
             // Fetch directory listing
-            fetch('/')
-                .then(response => response.text())
-                .then(html => {
-                    // Extract links to HTML and JSON reports
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const links = Array.from(doc.querySelectorAll('a'));
-                    
-                    // Filter for report files
-                    const reportLinks = links.filter(link => {
-                        const href = link.getAttribute('href');
-                        return href && (
-                            href.includes('security_report') && 
-                            (href.endsWith('.html') || href.endsWith('.json'))
-                        );
-                    });
-                    
-                    // Sort by name (newest first)
-                    reportLinks.sort((a, b) => {
-                        return b.getAttribute('href').localeCompare(a.getAttribute('href'));
-                    });
-                    
+            fetch('reports.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(reports => {
                     // Display reports or show message if none found
-                    if (reportLinks.length > 0) {
+                    if (reports.length > 0) {
                         reportsList.innerHTML = '';
-                        reportLinks.forEach(link => {
-                            const href = link.getAttribute('href');
-                            const timestamp = href.match(/(\d{8}_\d{6})/);
-                            const dateStr = timestamp ? formatTimestamp(timestamp[1]) : '';
+                        reports.forEach(report => {
+                            const href = report.path;
+                            const timestamp = report.timestamp;
+                            const dateStr = timestamp ? formatTimestamp(timestamp) : '';
                             
                             const li = document.createElement('li');
                             li.innerHTML = `
-                                <a href="${href}">${href}</a>
+                                <a href="${href}">${report.name}</a>
                                 <span class="report-timestamp">${dateStr}</span>
                             `;
                             reportsList.appendChild(li);

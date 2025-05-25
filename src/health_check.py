@@ -8,6 +8,7 @@ import logging
 import os
 import socket
 import sys
+import subprocess
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -32,6 +33,13 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             self._handle_health_check()
         elif self.path == '/metrics':
             self._handle_metrics()
+        else:
+            self.send_error(404, "Not Found")
+
+    def do_POST(self):
+        """Handle POST requests"""
+        if self.path == '/generate_logs':
+            self._handle_generate_logs()
         else:
             self.send_error(404, "Not Found")
     
@@ -70,6 +78,48 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         }
         
         self.wfile.write(json.dumps(metrics).encode('utf-8'))
+
+    def _handle_generate_logs(self):
+        """Handle log generation request"""
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        
+        try:
+            params = json.loads(post_data.decode('utf-8'))
+            num_logs = params.get('num_logs', 10)
+            interval = params.get('interval', 1.0)
+            include_security = params.get('include_security', True)
+            app_type = params.get('app_type', 'generic')
+            
+            log_file_name = f"../data/logs/{app_type}_sample.log"
+            
+            command = [
+                sys.executable, # Use the current Python executable
+                str(Path(__file__).parent.parent / "tools" / "generate_test_logs.py"),
+                "-n", str(num_logs),
+                "-i", str(interval),
+                "-a", app_type,
+                "-f", log_file_name
+            ]
+            if not include_security:
+                command.append("--no-security")
+
+            logging.getLogger('health').info(f"Executing log generation command: {' '.join(command)}")
+            
+            # Run the script in a non-blocking way
+            subprocess.Popen(command, cwd=Path(__file__).parent.parent)
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = {'status': 'success', 'message': 'Log generation initiated.'}
+            self.wfile.write(json.dumps(response).encode('utf-8'))
+            
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+        except Exception as e:
+            logging.getLogger('health').error(f"Error generating logs: {e}")
+            self.send_error(500, f"Internal Server Error: {e}")
     
     def _get_memory_usage(self):
         """Get current memory usage"""
