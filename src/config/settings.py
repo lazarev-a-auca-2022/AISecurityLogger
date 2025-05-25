@@ -43,7 +43,7 @@ class Settings:
         self.redis_db = int(os.getenv('REDIS_DB', '0'))
         
         # Logging Configuration
-        self.log_level = os.getenv('LOG_LEVEL', 'default') # Changed default to DEBUG for more visibility
+        self.log_level = os.getenv('LOG_LEVEL', 'INFO') # Changed default to INFO for more visibility
         self.log_file = os.getenv('LOG_FILE', '/app/docker/application.log') # Changed log file path to /app/docker
         
         # Processing Configuration
