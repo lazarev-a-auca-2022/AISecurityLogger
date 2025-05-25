@@ -39,6 +39,7 @@ services:
       - SENSITIVITY_KEYWORDS=error,failed,denied,warning,critical,unauthorized,attack,breach,malware,virus
       - DB_PATH=/app/data/db/threats.db
       - OUTPUT_LOG_DIR=/app/reports
+      - HEALTH_CHECK_PORT=5356
     volumes:
       # Mount log sources (adjust paths as needed for your server)
       - /var/log:/host/var/log:ro
@@ -48,7 +49,7 @@ services:
       - ./config:/app/config
       - ./.env:/app/.env
     ports:
-      - "5356:5356"
+      - "5358:5356"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5356/health"]
       interval: 30s
@@ -78,7 +79,7 @@ services:
     container_name: ai-logger-nginx
     restart: unless-stopped
     ports:
-      - "5357:80"
+      - "5359:80"
     volumes:
       - ./reports:/usr/share/nginx/html/reports:ro
       - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro

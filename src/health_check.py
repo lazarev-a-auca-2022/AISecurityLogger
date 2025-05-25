@@ -165,7 +165,7 @@ class HealthCheckServer:
     
     def __init__(self, host='0.0.0.0', port=5356, app_status=None):
         self.host = host
-        self.port = port
+        self.port = int(os.environ.get('HEALTH_CHECK_PORT', port))  # Allow port override from environment
         self.app_status = app_status or {}
         self.server = None
         self.thread = None
