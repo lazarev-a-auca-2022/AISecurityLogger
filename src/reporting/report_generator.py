@@ -212,168 +212,600 @@ class ReportGenerator:
         return json.dumps(report_data, indent=2)
     
     def _generate_html_report(self, threats: List[Dict[str, Any]], start_time: float, end_time: float) -> str:
-        """Generate an HTML report"""
+        """Generate an HTML report with modern styling matching the dashboard"""
         start_time_str = datetime.datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')
         end_time_str = datetime.datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')
         
         severity_counts = self._count_by_severity(threats)
         
-        # Build HTML content
+        # Build HTML content with modern styling
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Threat Report</title>
+    <title>AI Security Logger - Security Threat Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body {{
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
+        :root {{
+            --primary-color: #667eea;
+            --primary-dark: #5a67d8;
+            --secondary-color: #764ba2;
+            --accent-color: #f093fb;
+            --success-color: #48bb78;
+            --warning-color: #ed8936;
+            --error-color: #f56565;
+            --info-color: #4299e1;
+            --critical-color: #e53e3e;
+            --background-color: #f7fafc;
+            --surface-color: #ffffff;
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+            --border-color: #e2e8f0;
+            --shadow-light: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+            --shadow-medium: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
+            --shadow-large: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+            --gradient-primary: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            --gradient-accent: linear-gradient(135deg, var(--accent-color) 0%, var(--primary-color) 100%);
+        }}
+
+        [data-theme="dark"] {{
+            --primary-color: #7c3aed;
+            --primary-dark: #6d28d9;
+            --secondary-color: #a855f7;
+            --accent-color: #ec4899;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --info-color: #3b82f6;
+            --critical-color: #dc2626;
+            --background-color: #0f172a;
+            --surface-color: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --shadow-light: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+            --shadow-medium: 0 4px 6px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+            --shadow-large: 0 10px 15px rgba(0, 0, 0, 0.4), 0 4px 6px rgba(0, 0, 0, 0.2);
+        }}
+
+        * {{
             margin: 0;
-            padding: 20px;
-            color: #333;
+            padding: 0;
+            box-sizing: border-box;
         }}
-        h1 {{
-            color: #2c3e50;
-            border-bottom: 2px solid #ecf0f1;
-            padding-bottom: 10px;
+
+        body {{
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--background-color);
+            overflow-x: hidden;
         }}
-        h2 {{
-            color: #3498db;
-            margin-top: 30px;
+
+        .background-pattern {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 25% 25%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+            z-index: -1;
         }}
-        .summary {{
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+
+        .header {{
+            background: var(--gradient-primary);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            box-shadow: var(--shadow-medium);
+            position: relative;
+            overflow: hidden;
         }}
-        .threat {{
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 15px;
-            margin-bottom: 15px;
+
+        .header::before {{
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.5;
         }}
+
+        .header-content {{
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }}
+
+        .header-controls {{
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            gap: 1rem;
+            z-index: 2;
+        }}
+
+        .theme-toggle {{
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }}
+
+        .theme-toggle:hover {{
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }}
+
+        .header h1 {{
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }}
+
+        .header .subtitle {{
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }}
+
+        .nav-breadcrumb {{
+            background: var(--surface-color);
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }}
+
+        .breadcrumb {{
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }}
+
+        .breadcrumb a {{
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }}
+
+        .breadcrumb a:hover {{
+            text-decoration: underline;
+        }}
+
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }}
+
+        .report-summary {{
+            background: var(--surface-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-medium);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }}
+
+        .report-summary::before {{
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-accent);
+        }}
+
+        .summary-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }}
+
+        .summary-item {{
+            text-align: center;
+        }}
+
+        .summary-label {{
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }}
+
+        .summary-value {{
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }}
+
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }}
+
+        .stat-card {{
+            background: var(--surface-color);
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+            position: relative;
+        }}
+
+        .stat-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-medium);
+        }}
+
+        .stat-icon {{
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 1.5rem;
+            color: white;
+        }}
+
+        .stat-number {{
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }}
+
+        .stat-label {{
+            color: var(--text-secondary);
+            font-size: 1rem;
+            font-weight: 500;
+        }}
+
+        .section {{
+            background: var(--surface-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-medium);
+            border: 1px solid var(--border-color);
+        }}
+
+        .section-header {{
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }}
+
+        .section-icon {{
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+            color: white;
+            font-size: 1.5rem;
+        }}
+
+        .section-title {{
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }}
+
+        .threat-card {{
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.2s ease;
+        }}
+
+        .threat-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-medium);
+        }}
+
         .threat-header {{
             display: flex;
             justify-content: space-between;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
         }}
-        .severity {{
-            font-weight: bold;
-            padding: 3px 10px;
-            border-radius: 3px;
+
+        .threat-info h3 {{
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }}
+
+        .threat-time {{
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }}
+
+        .severity-badge {{
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+
+        .severity-CRITICAL {{
+            background: var(--critical-color);
             color: white;
         }}
-        .CRITICAL {{
-            background-color: #e74c3c;
+
+        .severity-ERROR {{
+            background: var(--error-color);
+            color: white;
         }}
-        .ERROR {{
-            background-color: #e67e22;
+
+        .severity-WARNING {{
+            background: var(--warning-color);
+            color: white;
         }}
-        .WARNING {{
-            background-color: #f1c40f;
-            color: #333;
+
+        .severity-INFO {{
+            background: var(--info-color);
+            color: white;
         }}
-        .INFO {{
-            background-color: #3498db;
+
+        .threat-details {{
+            margin: 1rem 0;
+            color: var(--text-primary);
         }}
+
         .log-entries {{
-            background-color: #f9f9f9;
-            padding: 10px;
-            border-radius: 3px;
-            font-family: monospace;
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.875rem;
             white-space: pre-wrap;
             overflow-x: auto;
-            margin-top: 10px;
+            line-height: 1.5;
+            border: 1px solid #2d3748;
         }}
-        .stats {{
-            display: flex;
-            gap: 20px;
-            margin-bottom: 20px;
-        }}
-        .stat-box {{
-            flex: 1;
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
+
+        .empty-state {{
             text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
         }}
-        .stat-number {{
-            font-size: 24px;
-            font-weight: bold;
+
+        .empty-state i {{
+            font-size: 4rem;
+            color: var(--success-color);
+            margin-bottom: 1rem;
         }}
-        .empty-message {{
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 5px;
+
+        .empty-state h3 {{
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }}
+
+        .empty-state p {{
+            font-size: 1rem;
+            max-width: 400px;
+            margin: 0 auto;
+        }}
+
+        .footer {{
+            margin-top: 4rem;
             text-align: center;
-            margin-top: 20px;
+            padding: 2rem 0;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }}
+
+        @media (max-width: 768px) {{
+            .header h1 {{
+                font-size: 2rem;
+            }}
+            
+            .container {{
+                padding: 1rem;
+            }}
+            
+            .section {{
+                padding: 1.5rem;
+            }}
+            
+            .stats-grid {{
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }}
+            
+            .summary-grid {{
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }}
+            
+            .threat-header {{
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }}
+        }}
+
+        @media print {{
+            .header-controls {{
+                display: none;
+            }}
+            
+            .section {{
+                break-inside: avoid;
+            }}
         }}
     </style>
 </head>
 <body>
-    <h1>AI Security Logger - Threat Report</h1>
+    <div class="background-pattern"></div>
     
-    <div class="summary">
-        <p><strong>Report Period:</strong> {start_time_str} to {end_time_str}</p>
-        <p><strong>Generated:</strong> {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-        <p><strong>Total Threats Detected:</strong> {len(threats)}</p>
-    </div>
-    
-    <h2>Threat Statistics</h2>
-    
-    <div class="stats">
-        <div class="stat-box">
-            <div class="stat-number">{severity_counts.get('CRITICAL', 0)}</div>
-            <div>Critical</div>
+    <header class="header">
+        <div class="header-controls">
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon" id="theme-icon"></i>
+            </button>
         </div>
-        <div class="stat-box">
-            <div class="stat-number">{severity_counts.get('ERROR', 0)}</div>
-            <div>Error</div>
+        <div class="header-content">
+            <h1><i class="fas fa-shield-alt"></i> Security Threat Report</h1>
+            <p class="subtitle">Automated Threat Analysis & Detection Results</p>
         </div>
-        <div class="stat-box">
-            <div class="stat-number">{severity_counts.get('WARNING', 0)}</div>
-            <div>Warning</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-number">{severity_counts.get('INFO', 0)}</div>
-            <div>Info</div>
+    </header>
+
+    <div class="nav-breadcrumb">
+        <div class="breadcrumb">
+            <a href="index.html"><i class="fas fa-home"></i> Dashboard</a>
+            <i class="fas fa-chevron-right"></i>
+            <span>Security Report</span>
         </div>
     </div>
-    
-    <h2>Detected Threats</h2>
-    
-    {self._generate_threats_html(threats) if threats else '<div class="empty-message">No threats detected during this period.</div>'}
-    
-    <div style="margin-top: 30px; text-align: center; color: #7f8c8d; font-size: 12px;">
-        <p>AI Security Logger v1.0 - Powered by OpenRouter API</p>
+
+    <div class="container">
+        <div class="report-summary">
+            <h2><i class="fas fa-chart-line"></i> Report Summary</h2>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="summary-label">Report Period</div>
+                    <div class="summary-value">{start_time_str} to {end_time_str}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Generated</div>
+                    <div class="summary-value">{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Total Threats</div>
+                    <div class="summary-value">{len(threats)}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: var(--critical-color);">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-number">{severity_counts.get('CRITICAL', 0)}</div>
+                <div class="stat-label">Critical</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: var(--error-color);">
+                    <i class="fas fa-times-circle"></i>
+                </div>
+                <div class="stat-number">{severity_counts.get('ERROR', 0)}</div>
+                <div class="stat-label">Error</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: var(--warning-color);">
+                    <i class="fas fa-exclamation-circle"></i>
+                </div>
+                <div class="stat-number">{severity_counts.get('WARNING', 0)}</div>
+                <div class="stat-label">Warning</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: var(--info-color);">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <div class="stat-number">{severity_counts.get('INFO', 0)}</div>
+                <div class="stat-label">Info</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <div class="section-icon">
+                    <i class="fas fa-bug"></i>
+                </div>
+                <h2 class="section-title">Detected Threats</h2>
+            </div>
+            
+            {self._generate_threats_html(threats) if threats else self._generate_empty_state_html()}
+        </div>
+
+        <div class="footer">
+            <p><strong>AI Security Logger v2.0</strong> - Powered by Advanced ML Models</p>
+            <p>Report generated automatically on {datetime.datetime.now().strftime('%Y-%m-%d at %H:%M:%S')}</p>
+        </div>
     </div>
+
+    <script>
+        function toggleTheme() {{
+            const body = document.body;
+            const themeIcon = document.getElementById('theme-icon');
+            
+            if (body.getAttribute('data-theme') === 'dark') {{
+                body.removeAttribute('data-theme');
+                themeIcon.className = 'fas fa-moon';
+                localStorage.setItem('theme', 'light');
+            }} else {{
+                body.setAttribute('data-theme', 'dark');
+                themeIcon.className = 'fas fa-sun';
+                localStorage.setItem('theme', 'dark');
+            }}
+        }}
+
+        function initializeTheme() {{
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const themeIcon = document.getElementById('theme-icon');
+            
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {{
+                document.body.setAttribute('data-theme', 'dark');
+                themeIcon.className = 'fas fa-sun';
+            }} else {{
+                themeIcon.className = 'fas fa-moon';
+            }}
+        }}
+
+        document.addEventListener('DOMContentLoaded', function() {{
+            initializeTheme();
+        }});
+    </script>
 </body>
 </html>
 """
         return html
     
     def _generate_threats_html(self, threats: List[Dict[str, Any]]) -> str:
-        """Generate HTML for the threats section"""
-        if not threats:
-            empty_message = """
-    <div class="empty-message">
-        <p>No threats detected during this period.</p>
-        <p>This could be because:</p>
-        <ul>
-            <li>No logs were processed during this period</li>
-            <li>No security threats were detected in the processed logs</li>
-            <li>The logs directory is empty or inaccessible</li>
-        </ul>
-        <p>Check the log sources to ensure logs are being properly collected.</p>
-    </div>
-"""
-            return empty_message
-            
+        """Generate HTML for the threats section using modern card-based design"""            
         threats_html = ""
         
         for threat in threats:
@@ -397,37 +829,78 @@ class ReportGenerator:
                 else:
                     log_entries_html = "No log entries available"
                 
-                # Build the threat HTML
+                # Build the threat HTML using modern card design
                 threats_html += f"""
-    <div class="threat">
-        <div class="threat-header">
-            <h3>{summary}</h3>
-            <span class="severity {severity}">{severity}</span>
-        </div>
-        <p><strong>Time:</strong> {timestamp}</p>
-        <p><strong>Details:</strong> {threat.get('details', 'No details available')}</p>
-        
-        {f'<p><strong>Recommended Actions:</strong> {threat.get("recommended_actions", "")}</p>' if threat.get('recommended_actions') else ''}
-        
-        <details>
-            <summary>Log Entries</summary>
-            <div class="log-entries">{log_entries_html}</div>
-        </details>
-    </div>
+            <div class="threat-card">
+                <div class="threat-header">
+                    <div class="threat-info">
+                        <h3>{summary}</h3>
+                        <div class="threat-time">
+                            <i class="fas fa-clock"></i> {timestamp}
+                        </div>
+                    </div>
+                    <span class="severity-badge severity-{severity}">
+                        <i class="fas fa-{'exclamation-triangle' if severity == 'CRITICAL' else 'times-circle' if severity == 'ERROR' else 'exclamation-circle' if severity == 'WARNING' else 'info-circle'}"></i>
+                        {severity}
+                    </span>
+                </div>
+                
+                <div class="threat-details">
+                    <p><strong><i class="fas fa-info-circle"></i> Details:</strong></p>
+                    <p>{threat.get('details', 'No details available')}</p>
+                    
+                    {f'<p><strong><i class="fas fa-lightbulb"></i> Recommended Actions:</strong></p><p>{threat.get("recommended_actions", "")}</p>' if threat.get('recommended_actions') else ''}
+                </div>
+                
+                <details style="margin-top: 1rem;">
+                    <summary style="cursor: pointer; font-weight: 600; color: var(--primary-color); padding: 0.5rem 0;">
+                        <i class="fas fa-file-alt"></i> View Log Entries
+                    </summary>
+                    <div class="log-entries">{log_entries_html}</div>
+                </details>
+            </div>
 """
             except Exception as e:
                 self.logger.error(f"Error formatting threat for HTML: {e}")
                 threats_html += f"""
-    <div class="threat">
-        <div class="threat-header">
-            <h3>Error Processing Threat</h3>
-            <span class="severity WARNING">WARNING</span>
-        </div>
-        <p>There was an error processing this threat data.</p>
-    </div>
+            <div class="threat-card">
+                <div class="threat-header">
+                    <div class="threat-info">
+                        <h3>Error Processing Threat</h3>
+                        <div class="threat-time">
+                            <i class="fas fa-clock"></i> {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                        </div>
+                    </div>
+                    <span class="severity-badge severity-WARNING">
+                        <i class="fas fa-exclamation-circle"></i>
+                        WARNING
+                    </span>
+                </div>
+                <div class="threat-details">
+                    <p>There was an error processing this threat data: {str(e)}</p>
+                </div>
+            </div>
 """
         
         return threats_html
+    
+    def _generate_empty_state_html(self) -> str:
+        """Generate HTML for empty state when no threats are found"""
+        return """
+            <div class="empty-state">
+                <i class="fas fa-shield-check"></i>
+                <h3>No Security Threats Detected</h3>
+                <p>Excellent! No threats were detected during this reporting period. Your systems appear to be secure.</p>
+                <div style="margin-top: 1.5rem; padding: 1rem; background: var(--background-color); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <p style="margin-bottom: 0.5rem;"><strong>This could indicate:</strong></p>
+                    <ul style="text-align: left; max-width: 400px; margin: 0 auto;">
+                        <li>All systems are operating normally</li>
+                        <li>Security measures are effectively preventing threats</li>
+                        <li>No suspicious activity detected in logs</li>
+                    </ul>
+                </div>
+            </div>
+        """
     
     def _count_by_severity(self, threats: List[Dict[str, Any]]) -> Dict[str, int]:
         """Count threats by severity"""

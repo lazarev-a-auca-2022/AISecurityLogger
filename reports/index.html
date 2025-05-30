@@ -3,136 +3,1087 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Security Logger - Reports</title>
+    <title>AI Security Logger - Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
+        :root {
+            --primary-color: #667eea;
+            --primary-dark: #5a67d8;
+            --secondary-color: #764ba2;
+            --accent-color: #f093fb;
+            --success-color: #48bb78;
+            --warning-color: #ed8936;
+            --error-color: #f56565;
+            --info-color: #4299e1;
+            --background-color: #f7fafc;
+            --surface-color: #ffffff;
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+            --border-color: #e2e8f0;
+            --shadow-light: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+            --shadow-medium: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
+            --shadow-large: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+            --gradient-primary: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            --gradient-accent: linear-gradient(135deg, var(--accent-color) 0%, var(--primary-color) 100%);
+        }
+
+        [data-theme="dark"] {
+            --primary-color: #7c3aed;
+            --primary-dark: #6d28d9;
+            --secondary-color: #a855f7;
+            --accent-color: #ec4899;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --info-color: #3b82f6;
+            --background-color: #0f172a;
+            --surface-color: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --shadow-light: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+            --shadow-medium: 0 4px 6px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+            --shadow-large: 0 10px 15px rgba(0, 0, 0, 0.4), 0 4px 6px rgba(0, 0, 0, 0.2);
+            --gradient-primary: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            --gradient-accent: linear-gradient(135deg, var(--accent-color) 0%, var(--primary-color) 100%);
+        }
+
+        * {
             margin: 0;
-            padding: 20px;
-            color: #333;
+            padding: 0;
+            box-sizing: border-box;
         }
-        h1 {
-            color: #2c3e50;
-            border-bottom: 2px solid #ecf0f1;
-            padding-bottom: 10px;
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--background-color);
+            overflow-x: hidden;
         }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
+
+        .background-pattern {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 25% 25%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+            z-index: -1;
         }
-        .card {
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .btn {
-            display: inline-block;
-            background-color: #3498db;
+
+        .header {
+            background: var(--gradient-primary);
             color: white;
-            padding: 8px 16px;
+            padding: 2rem 0;
+            text-align: center;
+            box-shadow: var(--shadow-medium);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.5;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .header-controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            gap: 1rem;
+            z-index: 2;
+        }
+
+        .theme-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .slide-in-up {
+            animation: slideInUp 0.6s ease;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.8s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--surface-color);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: var(--shadow-medium);
+            transition: all 0.3s ease;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-accent);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-large);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .card-description {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
             text-decoration: none;
-            border-radius: 4px;
-            margin-right: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.95rem;
+            position: relative;
+            overflow: hidden;
         }
-        .btn:hover {
-            background-color: #2980b9;
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
         }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--surface-color);
+            color: var(--text-primary);
+            border: 2px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .btn-info {
+            background: var(--info-color);
+            color: white;
+        }
+
+        .reports-section {
+            background: var(--surface-color);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: var(--shadow-medium);
+            border: 1px solid var(--border-color);
+        }
+
         .reports-list {
             list-style: none;
             padding: 0;
         }
-        .reports-list li {
-            border-bottom: 1px solid #eee;
-            padding: 10px 0;
+
+        .report-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 0.75rem;
+            transition: all 0.2s ease;
+            background: var(--background-color);
         }
-        .reports-list a {
-            color: #3498db;
-            text-decoration: none;
+
+        .report-item:hover {
+            transform: translateX(4px);
+            border-color: var(--primary-color);
+            background: var(--surface-color);
         }
-        .reports-list a:hover {
-            text-decoration: underline;
+
+        .report-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
+
+        .report-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: var(--gradient-accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .report-details h4 {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
         .report-timestamp {
-            color: #7f8c8d;
-            font-size: 0.9em;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
         }
-        footer {
-            margin-top: 30px;
+
+        .report-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .report-link:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .stat-card {
+            background: var(--surface-color);
+            padding: 1.5rem;
+            border-radius: 12px;
             text-align: center;
-            color: #7f8c8d;
-            font-size: 0.9em;
-            border-top: 1px solid #ecf0f1;
-            padding-top: 20px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .stat-card:hover::before {
+            left: 100%;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: var(--shadow-large);
+            border-color: var(--primary-color);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .stat-icon {
+            font-size: 1.5rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--border-color);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--gradient-primary);
+            border-radius: 3px;
+            transition: width 1s ease;
+        }
+
+        .data-visualization {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--background-color);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .chart-placeholder {
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            color: var(--border-color);
+            margin-bottom: 1rem;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .error-details {
+            font-size: 0.875rem;
+            color: var(--error-color);
+            margin-top: 0.5rem;
+            font-family: monospace;
+        }
+
+        .footer {
+            margin-top: 4rem;
+            text-align: center;
+            padding: 2rem 0;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--primary-color);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-online {
+            background: var(--success-color);
+            box-shadow: 0 0 0 2px rgba(72, 187, 120, 0.2);
+        }
+
+        .status-offline {
+            background: var(--error-color);
+            box-shadow: 0 0 0 2px rgba(245, 101, 101, 0.2);
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+            
+            .card {
+                padding: 1.5rem;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+            }
+            
+            .report-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            
+            .footer-links {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+
+        /* Custom Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background-color: var(--surface-color);
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: var(--shadow-large);
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .close {
+            color: var(--text-secondary);
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .close:hover {
+            color: var(--error-color);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary-color);
+        }
+
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        [data-theme="dark"] .glassmorphism {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(51, 65, 85, 0.3);
+        }
+
+        .floating-action-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: var(--shadow-large);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .floating-action-btn:hover {
+            transform: scale(1.1) rotate(90deg);
+            box-shadow: 0 20px 40px rgba(102, 126, 234, 0.4);
+        }
+
+        .gradient-text {
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .sparkle {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sparkle::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: rotate(45deg);
+            animation: sparkle 3s infinite;
+        }
+
+        @keyframes sparkle {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+
+        .card-enhanced {
+            position: relative;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .card-enhanced:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 25px 50px rgba(102, 126, 234, 0.25);
+        }
+
+        .card-enhanced::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--gradient-accent);
+            opacity: 0;
+            border-radius: 16px;
+            transition: opacity 0.3s ease;
+            z-index: -1;
+        }
+
+        .card-enhanced:hover::after {
+            opacity: 0.1;
+        }
+
+        .typing-effect {
+            border-right: 2px solid var(--primary-color);
+            animation: typing 3s steps(40, end), blink 0.75s step-end infinite;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        @keyframes typing {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+
+        @keyframes blink {
+            from, to { border-color: transparent; }
+            50% { border-color: var(--primary-color); }
+        }
+
+        .parallax-bg {
+            background-attachment: fixed;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: cover;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>AI Security Logger - Reports</h1>
-        
-        <div class="card">
-            <h2>Quick Access</h2>
-            <p>View the latest security report or check system health.</p>
-            <a href="latest_report.html" id="latestReportLink" class="btn">Latest Report</a>
-            <a href="http://localhost:8081/health" class="btn">System Health</a>
-            <a href="http://localhost:8081/metrics" class="btn">System Metrics</a>
-            <button id="generateCustomReportBtn" class="btn">Generate Custom Report</button>
+    <div class="background-pattern"></div>
+    
+    <header class="header">
+        <div class="header-controls">
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                <i class="fas fa-moon" id="theme-icon"></i>
+            </button>
         </div>
-        
-        <div class="card">
-            <h2>All Reports</h2>
-            <p>Click on a report to view details:</p>
+        <div class="header-content">
+            <h1><i class="fas fa-shield-alt pulse-animation"></i> AI Security Logger</h1>
+            <p class="subtitle">Advanced Threat Detection & Monitoring Dashboard</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card slide-in-up">
+                <div class="stat-number" id="totalReports">
+                    <i class="fas fa-file-alt stat-icon"></i>
+                    <span>0</span>
+                </div>
+                <div class="stat-label">Total Reports</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 75%"></div>
+                </div>
+            </div>
+            <div class="stat-card slide-in-up">
+                <div class="stat-number" id="systemStatus">
+                    <i class="fas fa-circle stat-icon"></i>
+                    <span class="status-indicator status-offline"></span>Checking
+                </div>
+                <div class="stat-label">System Status</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 100%"></div>
+                </div>
+            </div>
+            <div class="stat-card slide-in-up">
+                <div class="stat-number" id="lastUpdate">
+                    <i class="fas fa-clock stat-icon"></i>
+                    <span>-</span>
+                </div>
+                <div class="stat-label">Last Update</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 60%"></div>
+                </div>
+            </div>
+            <div class="stat-card slide-in-up">
+                <div class="stat-number" id="threatLevel">
+                    <i class="fas fa-exclamation-triangle stat-icon"></i>
+                    <span>-</span>
+                </div>
+                <div class="stat-label">Threat Level</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 85%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card card-enhanced">
+                <div class="card-header">
+                    <div class="card-icon">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <div>
+                        <h2 class="card-title gradient-text">Quick Actions</h2>
+                    </div>
+                </div>
+                <p class="card-description">Access the latest security reports and monitor system health in real-time.</p>
+                <div class="btn-group">
+                    <a href="latest_report.html" id="latestReportLink" class="btn btn-primary">
+                        <i class="fas fa-file-alt"></i> Latest Report
+                    </a>
+                    <a href="http://localhost:5356/health" class="btn btn-success">
+                        <i class="fas fa-heartbeat"></i> System Health
+                    </a>
+                    <a href="http://localhost:5356/metrics" class="btn btn-info">
+                        <i class="fas fa-chart-line"></i> Metrics
+                    </a>
+                </div>
+            </div>
+
+            <div class="card card-enhanced sparkle">
+                <div class="card-header">
+                    <div class="card-icon">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <div>
+                        <h2 class="card-title gradient-text">Report Generation</h2>
+                    </div>
+                </div>
+                <p class="card-description">Generate custom security reports with specific parameters for different application types.</p>
+                <div class="btn-group">
+                    <button id="generateCustomReportBtn" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Generate Custom Report
+                    </button>
+                    <button id="refreshReportsBtn" class="btn btn-secondary">
+                        <i class="fas fa-sync-alt"></i> Refresh Reports
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="reports-section card card-enhanced">
+            <div class="card-header">
+                <div class="card-icon">
+                    <i class="fas fa-folder-open"></i>
+                </div>
+                <div>
+                    <h2 class="card-title gradient-text">Security Reports</h2>
+                </div>
+            </div>
+            <p class="card-description">Browse and access all generated security reports. Click on any report to view detailed analysis.</p>
+            
+            <!-- Debug button for testing -->
+            <div style="margin-bottom: 1rem;">
+                <button id="debugLoadReports" style="background: var(--primary-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
+                    <i class="fas fa-bug"></i> Debug: Load Reports
+                </button>
+            </div>
             
             <ul class="reports-list" id="reportsList">
-                <li>Loading reports...</li>
+                <li class="report-item">
+                    <div class="report-info">
+                        <div class="loading-spinner"></div>
+                        <div class="report-details">
+                            <h4>Loading reports...</h4>
+                            <div class="report-timestamp">Please wait while reports are loaded</div>
+                        </div>
+                    </div>
+                </li>
             </ul>
         </div>
-        
-        <footer>
-            <p>AI Security Logger v1.0 - Powered by OpenRouter API</p>
-            <p>Built for FastPanel Server Management</p>
+
+        <footer class="footer">
+            <div class="footer-links">
+                <a href="#"><i class="fas fa-book"></i> Documentation</a>
+                <a href="#"><i class="fas fa-question-circle"></i> Support</a>
+                <a href="#"><i class="fab fa-github"></i> GitHub</a>
+            </div>
+            <p><strong>AI Security Logger v2.0</strong> - Powered by Advanced ML Models</p>
+            <p>Built for FastPanel Server Management & Security Monitoring</p>
         </footer>
+
+        <!-- Floating Action Button -->
+        <button class="floating-action-btn" onclick="quickAction()" title="Quick Actions">
+            <i class="fas fa-plus"></i>
+        </button>
     </div>
 
+    <!-- Custom Report Generation Modal -->
+    <div id="reportModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2><i class="fas fa-plus-circle"></i> Generate Custom Report</h2>
+            
+            <form id="reportForm">
+                <div class="form-group">
+                    <label class="form-label" for="appType">Application Type</label>
+                    <select id="appType" class="form-select" required>
+                        <option value="generic">Generic</option>
+                        <option value="apache">Apache</option>
+                        <option value="nginx">Nginx</option>
+                        <option value="wordpress">WordPress</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="numLogs">Number of Logs</label>
+                    <input type="number" id="numLogs" class="form-input" value="10" min="1" max="1000" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="interval">Interval (seconds)</label>
+                    <input type="number" id="interval" class="form-input" value="1.0" min="0.1" step="0.1" required>
+                </div>
+                
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="includeSecurity" checked>
+                        <label class="form-label" for="includeSecurity">Include Security Logs</label>
+                    </div>
+                </div>
+                
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-rocket"></i> Generate Report
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     <script>
-        // Simple script to load and display report files
+        // Enhanced script with modern functionality
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM Content Loaded');
+            
             const reportsList = document.getElementById('reportsList');
             const generateCustomReportBtn = document.getElementById('generateCustomReportBtn');
+            const refreshReportsBtn = document.getElementById('refreshReportsBtn');
+            const modal = document.getElementById('reportModal');
+            const reportForm = document.getElementById('reportForm');
+            const closeBtn = document.getElementsByClassName('close')[0];
 
-            const appTypes = ["generic", "apache", "nginx", "wordpress"]; // Must match APP_LOG_PATTERNS keys in Python script
+            const appTypes = ["generic", "apache", "nginx", "wordpress"];
 
+            // Check if required elements exist
+            if (!reportsList) {
+                console.error('reportsList element not found during initialization!');
+            } else {
+                console.log('reportsList found:', reportsList);
+            }
+
+            // Initialize dashboard
+            initializeTheme();
+            checkSystemStatus();
+            
+            // Use a more robust approach to ensure DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    console.log('Secondary DOM ready event');
+                    setTimeout(loadReports, 500);
+                });
+            } else {
+                console.log('DOM already ready, loading reports immediately');
+                setTimeout(loadReports, 100);
+            }
+            
+            animateStatCards();
+            updateProgressBars();
+
+            // Modal event listeners
             generateCustomReportBtn.addEventListener('click', function() {
-                let appType = prompt(`Enter App Type (${appTypes.join(', ')}):`, "generic");
-                if (!appType) return;
-                appType = appType.toLowerCase();
-                if (!appTypes.includes(appType)) {
-                    alert(`Invalid app type. Please choose from: ${appTypes.join(', ')}`);
-                    return;
+                modal.style.display = 'block';
+            });
+
+            closeBtn.addEventListener('click', closeModal);
+            
+            window.addEventListener('click', function(event) {
+                if (event.target === modal) {
+                    closeModal();
                 }
+            });
 
-                const numLogs = prompt("Enter Number of Logs (default: 10):", "10");
-                if (numLogs === null) return;
-                const interval = prompt("Enter Interval in Seconds (default: 1.0):", "1.0");
-                if (interval === null) return;
-                const includeSecurity = confirm("Include Security Logs? (OK for Yes, Cancel for No)");
+            refreshReportsBtn.addEventListener('click', function() {
+                refreshReportsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+                loadReports().finally(() => {
+                    refreshReportsBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Reports';
+                });
+            });
 
-                const logFileName = `${appType}_sample.log`; // Suggest a log file name based on app type
+            // Debug button event listener
+            const debugBtn = document.getElementById('debugLoadReports');
+            if (debugBtn) {
+                debugBtn.addEventListener('click', function() {
+                    console.log('Debug button clicked - manually loading reports');
+                    debugBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+                    loadReports().finally(() => {
+                        debugBtn.innerHTML = '<i class="fas fa-bug"></i> Debug: Load Reports';
+                    });
+                });
+            }
 
-                fetch('http://localhost:8081/generate_logs', {
+            // Form submission
+            reportForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                generateCustomReport();
+            });
+
+            function closeModal() {
+                modal.style.display = 'none';
+            }
+
+            function generateCustomReport() {
+                const appType = document.getElementById('appType').value;
+                const numLogs = parseInt(document.getElementById('numLogs').value);
+                const interval = parseFloat(document.getElementById('interval').value);
+                const includeSecurity = document.getElementById('includeSecurity').checked;
+
+                const logFileName = `${appType}_sample.log`;
+
+                // Show loading state
+                const submitBtn = reportForm.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+                submitBtn.disabled = true;
+
+                fetch('http://localhost:5356/generate_logs', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        num_logs: parseInt(numLogs),
-                        interval: parseFloat(interval),
+                        num_logs: numLogs,
+                        interval: interval,
                         include_security: includeSecurity,
                         app_type: appType,
-                        log_file_name: logFileName // Pass the suggested file name
+                        log_file_name: logFileName
                     }),
                 })
                 .then(response => {
@@ -142,63 +1093,318 @@
                     return response.json();
                 })
                 .then(data => {
-                    alert(`Log generation: ${data.status}. ${data.message}\n\nRefresh this page in a few moments to see the new report.`);
-                    // Optionally, refresh the reports list after a delay
-                    // setTimeout(() => location.reload(), 3000); 
+                    showNotification(`Report generation started: ${data.message}`, 'success');
+                    closeModal();
+                    
+                    // Refresh reports after a delay
+                    setTimeout(() => {
+                        loadReports();
+                    }, 3000);
                 })
                 .catch(error => {
-                    console.error('Error initiating log generation:', error);
-                    alert(`Error initiating log generation: ${error.message}`);
-                });
-            });
-            
-            // Fetch directory listing
-            fetch('reports.json')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
+                    console.error('Error generating report:', error);
+                    showNotification(`Error generating report: ${error.message}`, 'error');
                 })
-                .then(reports => {
-                    // Display reports or show message if none found
-                    if (reports.length > 0) {
+                .finally(() => {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                });
+            }
+
+            function loadReports() {
+                console.log('Loading reports...');
+                const reportsList = document.getElementById('reportsList');
+                
+                if (!reportsList) {
+                    console.error('reportsList element not found!');
+                    return Promise.reject(new Error('reportsList element not found'));
+                }
+                
+                return fetch('reports.json')
+                    .then(response => {
+                        console.log('Fetch response:', response.status);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(reports => {
+                        console.log('Reports loaded:', reports);
+                        updateStats(reports);
+                        displayReports(reports);
+                    })
+                    .catch(error => {
+                        console.error('Error loading reports:', error);
+                        reportsList.innerHTML = `
+                            <li class="empty-state">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <h3>Error Loading Reports</h3>
+                                <p>Unable to load reports. Please try again later.</p>
+                                <p class="error-details">Error: ${error.message}</p>
+                            </li>
+                        `;
+                    });
+            }
+
+            function displayReports(reports) {
+                console.log('displayReports called with:', reports);
+                const reportsList = document.getElementById('reportsList');
+                
+                if (!reportsList) {
+                    console.error('reportsList element not found in displayReports!');
+                    return;
+                }
+                
+                console.log('Clearing reportsList and adding reports...');
+                
+                try {
+                    if (reports && Array.isArray(reports) && reports.length > 0) {
                         reportsList.innerHTML = '';
-                        reports.forEach(report => {
-                            const href = report.path;
-                            const timestamp = report.timestamp;
-                            const dateStr = timestamp ? formatTimestamp(timestamp) : '';
+                        console.log('Processing', reports.length, 'reports');
+                        
+                        reports.forEach((report, index) => {
+                            console.log('Processing report', index, ':', report);
+                            const href = report.path || '#';
+                            const timestamp = report.timestamp || '';
+                            const dateStr = timestamp ? formatTimestamp(timestamp) : 'Unknown';
                             
                             const li = document.createElement('li');
+                            li.className = 'report-item';
                             li.innerHTML = `
-                                <a href="${href}">${report.name}</a>
-                                <span class="report-timestamp">${dateStr}</span>
+                                <div class="report-info">
+                                    <div class="report-icon">
+                                        <i class="fas fa-file-alt"></i>
+                                    </div>
+                                    <div class="report-details">
+                                        <h4>${report.name || 'Unnamed Report'}</h4>
+                                        <div class="report-timestamp">${dateStr}</div>
+                                    </div>
+                                </div>
+                                <a href="${href}" class="report-link">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
                             `;
                             reportsList.appendChild(li);
                         });
+                        console.log('Successfully added all reports to DOM');
                     } else {
-                        reportsList.innerHTML = '<li>No reports found. Reports will appear here once generated.</li>';
+                        console.log('No reports found or reports is not an array');
+                        reportsList.innerHTML = `
+                            <li class="empty-state">
+                                <i class="fas fa-folder-open"></i>
+                                <h3>No Reports Found</h3>
+                                <p>Generate your first security report to get started.</p>
+                            </li>
+                        `;
                     }
-                })
-                .catch(error => {
-                    console.error('Error loading reports:', error);
-                    reportsList.innerHTML = '<li>Error loading reports. Please try again later.</li>';
+                } catch (error) {
+                    console.error('Error in displayReports:', error);
+                    reportsList.innerHTML = `
+                        <li class="empty-state">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <h3>Error Displaying Reports</h3>
+                            <p>An error occurred while displaying reports.</p>
+                            <p class="error-details">Error: ${error.message}</p>
+                        </li>
+                    `;
+                }
+            }
+
+            function updateStats(reports) {
+                const totalElement = document.getElementById('totalReports').querySelector('span');
+                totalElement.textContent = reports.length;
+                
+                if (reports.length > 0) {
+                    const latestReport = reports[0];
+                    const lastUpdate = latestReport.timestamp ? formatTimestamp(latestReport.timestamp) : 'Never';
+                    const lastUpdateElement = document.getElementById('lastUpdate').querySelector('span');
+                    lastUpdateElement.textContent = lastUpdate;
+                } else {
+                    const lastUpdateElement = document.getElementById('lastUpdate').querySelector('span');
+                    lastUpdateElement.textContent = 'Never';
+                }
+
+                // Calculate threat level based on recent reports
+                let threatLevel = 'Low';
+                if (reports.length > 10) {
+                    threatLevel = 'High';
+                } else if (reports.length > 5) {
+                    threatLevel = 'Medium';
+                }
+                
+                const threatElement = document.getElementById('threatLevel').querySelector('span');
+                threatElement.textContent = threatLevel;
+                
+                // Update threat level color based on level
+                const threatIcon = document.getElementById('threatLevel').querySelector('i');
+                if (threatLevel === 'High') {
+                    threatIcon.style.color = 'var(--error-color)';
+                } else if (threatLevel === 'Medium') {
+                    threatIcon.style.color = 'var(--warning-color)';
+                } else {
+                    threatIcon.style.color = 'var(--success-color)';
+                }
+                
+                // Update progress bars based on data
+                updateProgressBars();
+            }
+
+            function checkSystemStatus() {
+                fetch('http://localhost:5356/health')
+                    .then(response => {
+                        const statusElement = document.getElementById('systemStatus');
+                        if (response.ok) {
+                            statusElement.innerHTML = '<i class="fas fa-circle stat-icon" style="color: var(--success-color);"></i><span class="status-indicator status-online"></span>Online';
+                        } else {
+                            statusElement.innerHTML = '<i class="fas fa-circle stat-icon" style="color: var(--error-color);"></i><span class="status-indicator status-offline"></span>Offline';
+                        }
+                    })
+                    .catch(error => {
+                        const statusElement = document.getElementById('systemStatus');
+                        statusElement.innerHTML = '<i class="fas fa-circle stat-icon" style="color: var(--error-color);"></i><span class="status-indicator status-offline"></span>Offline';
+                    });
+            }
+
+            function formatTimestamp(timestamp) {
+                if (!timestamp || timestamp.length !== 15) return 'Invalid Date';
+                
+                const year = timestamp.substring(0, 4);
+                const month = timestamp.substring(4, 6);
+                const day = timestamp.substring(6, 8);
+                const hour = timestamp.substring(9, 11);
+                const minute = timestamp.substring(11, 13);
+                const second = timestamp.substring(13, 15);
+                
+                return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+            }
+
+            function toggleTheme() {
+                const body = document.body;
+                const themeIcon = document.getElementById('theme-icon');
+                
+                if (body.getAttribute('data-theme') === 'dark') {
+                    body.removeAttribute('data-theme');
+                    if (themeIcon) themeIcon.className = 'fas fa-moon';
+                    localStorage.setItem('theme', 'light');
+                    console.log('Switched to light theme');
+                } else {
+                    body.setAttribute('data-theme', 'dark');
+                    if (themeIcon) themeIcon.className = 'fas fa-sun';
+                    localStorage.setItem('theme', 'dark');
+                    console.log('Switched to dark theme');
+                }
+            }
+
+            function initializeTheme() {
+                const savedTheme = localStorage.getItem('theme');
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const themeIcon = document.getElementById('theme-icon');
+                
+                // Default to dark theme if no saved preference
+                if (savedTheme === 'light') {
+                    document.body.removeAttribute('data-theme');
+                    if (themeIcon) themeIcon.className = 'fas fa-moon';
+                } else {
+                    // Default to dark theme (including when savedTheme is null/undefined)
+                    document.body.setAttribute('data-theme', 'dark');
+                    if (themeIcon) themeIcon.className = 'fas fa-sun';
+                    // Save dark as default if no preference was set
+                    if (!savedTheme) {
+                        localStorage.setItem('theme', 'dark');
+                    }
+                }
+            }
+
+            function animateStatCards() {
+                const statCards = document.querySelectorAll('.stat-card');
+                statCards.forEach((card, index) => {
+                    setTimeout(() => {
+                        card.style.opacity = '0';
+                        card.style.transform = 'translateY(20px)';
+                        card.style.transition = 'all 0.5s ease';
+                        
+                        setTimeout(() => {
+                            card.style.opacity = '1';
+                            card.style.transform = 'translateY(0)';
+                        }, 100);
+                    }, index * 150);
                 });
-        });
-        
-        // Format timestamp from filename (YYYYMMDD_HHMMSS)
-        function formatTimestamp(timestamp) {
-            if (!timestamp || timestamp.length !== 15) return '';
-            
-            const year = timestamp.substring(0, 4);
-            const month = timestamp.substring(4, 6);
-            const day = timestamp.substring(6, 8);
-            const hour = timestamp.substring(9, 11);
-            const minute = timestamp.substring(11, 13);
-            const second = timestamp.substring(13, 15);
-            
-            return `(${year}-${month}-${day} ${hour}:${minute}:${second})`;
-        }
-    </script>
-</body>
-</html>
+            }
+
+            function updateProgressBars() {
+                const progressBars = document.querySelectorAll('.progress-fill');
+                progressBars.forEach((bar) => {
+                    const width = bar.style.width;
+                    bar.style.width = '0%';
+                    setTimeout(() => {
+                        bar.style.width = width;
+                    }, 500);
+                });
+            }
+
+            function quickAction() {
+                const actions = [
+                    { text: 'Generate Report', action: () => document.getElementById('generateCustomReportBtn').click() },
+                    { text: 'Refresh Data', action: () => document.getElementById('refreshReportsBtn').click() },
+                    { text: 'View Latest', action: () => window.location.href = 'latest_report.html' },
+                    { text: 'Toggle Theme', action: toggleTheme }
+                ];
+                
+                const actionMenu = document.createElement('div');
+                actionMenu.style.cssText = `
+                    position: fixed;
+                    bottom: 5rem;
+                    right: 2rem;
+                    background: var(--surface-color);
+                    border-radius: 12px;
+                    padding: 1rem;
+                    box-shadow: var(--shadow-large);
+                    z-index: 999;
+                    min-width: 200px;
+                    border: 1px solid var(--border-color);
+                `;
+                
+                actions.forEach(action => {
+                    const button = document.createElement('button');
+                    button.textContent = action.text;
+                    button.style.cssText = `
+                        display: block;
+                        width: 100%;
+                        padding: 0.75rem;
+                        margin-bottom: 0.5rem;
+                        background: transparent;
+                        border: none;
+                        text-align: left;
+                        cursor: pointer;
+                        border-radius: 6px;
+                        transition: background 0.2s ease;
+                        color: var(--text-primary);
+                    `;
+                    button.onmouseover = () => button.style.background = 'var(--background-color)';
+                    button.onmouseout = () => button.style.background = 'transparent';
+                    button.onclick = () => {
+                        action.action();
+                        document.body.removeChild(actionMenu);
+                    };
+                    actionMenu.appendChild(button);
+                });
+                
+                document.body.appendChild(actionMenu);
+                
+                // Remove menu after 5 seconds or on outside click
+                setTimeout(() => {
+                    if (document.body.contains(actionMenu)) {
+                        document.body.removeChild(actionMenu);
+                    }
+                }, 5000);
+                
+                document.addEventListener('click', function closeMenu(e) {
+                    if (!actionMenu.contains(e.target) && !e.target.closest('.floating-action-btn')) {
+                        if (document.body.contains(actionMenu)) {
+                            document.body.removeChild(actionMenu);
+                        }
+                        document.removeEventListener('click', closeMenu);
+                    }
+                });
+            }
+        })

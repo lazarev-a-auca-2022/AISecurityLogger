@@ -97,6 +97,10 @@ class LogIngestor:
                 # Try to rename processed files
                 await self._rename_processed_files()
                 
+                # Log current status
+                if self.files_to_rename:
+                    self.logger.debug(f"Files awaiting rename: {list(self.files_to_rename.keys())}")
+                
         except Exception as e:
             self.logger.error(f"Error in log ingestor: {e}")
             raise
@@ -181,6 +185,14 @@ class LogIngestor:
                 # Process lines
                 for line in lines_found:
                     await self._process_log_line(line, file_path)
+                
+                # Schedule file for renaming after processing if we found lines to process
+                if (lines_found and 
+                    not file_path.endswith('.old') and 
+                    "application.log" not in file_path and 
+                    file_path not in self.files_to_rename):
+                    self.logger.info(f"Scheduled file {file_path} for renaming after initial tail processing")
+                    self._schedule_file_for_rename(file_path)
                     
         except Exception as e:
             self.logger.error(f"Error tailing file {file_path}: {e}")
@@ -214,12 +226,12 @@ class LogIngestor:
                         if result:
                             analysis_results.append(result)
             
-            # Only schedule the file for renaming if we haven't done so already
-            # and we've successfully processed all lines
+            # Schedule the file for renaming if we've processed it and it's not already scheduled
+            # This handles both files with new content and files that were fully processed during initial tailing
             if (not file_path.endswith('.old') and 
                 "application.log" not in file_path and 
-                len(new_lines) > 0 and 
-                file_path not in self.files_to_rename):
+                file_path not in self.files_to_rename and
+                file_path not in self.processed_files):
                 self.logger.info(f"Scheduled file {file_path} for renaming after analysis completes")
                 # Add to a list of files to be renamed later
                 self._schedule_file_for_rename(file_path)
@@ -239,6 +251,8 @@ class LogIngestor:
             
         # Create a list of files to process to avoid modifying dict during iteration
         files_to_process = list(self.files_to_rename.keys())
+        self.logger.debug(f"Checking {len(files_to_process)} files for renaming. Threat analyzer processing: {self.threat_analyzer.processing}, queue length: {len(self.threat_analyzer.queue)}")
+        
         for file_path in files_to_process:
             # Only attempt rename if threat analyzer is idle
             if (not self.threat_analyzer.processing and 
@@ -294,7 +308,7 @@ class LogIngestor:
                         # Remove from rename queue
                         self.files_to_rename.pop(file_path, None)
             else:
-                self.logger.debug(f"Skipping rename for {file_path}: Threat analyzer busy.")
+                self.logger.debug(f"Skipping rename for {file_path}: Threat analyzer busy (processing={self.threat_analyzer.processing}, queue={len(self.threat_analyzer.queue)}).")
     
     async def _process_log_line(self, line: str, source_file: str):
         """Process a single log line"""
@@ -433,3 +447,40 @@ class LogIngestor:
             
             # Sleep briefly to prevent busy loop
             await asyncio.sleep(0.1)
+    
+    async def force_complete_analysis(self):
+        """Force completion of any pending analysis and renaming of processed files"""
+        self.logger.info("Forcing completion of analysis and file renaming...")
+        
+        # Process any remaining items in the threat analyzer queue
+        if len(self.threat_analyzer.queue) > 0:
+            self.logger.info(f"Processing remaining {len(self.threat_analyzer.queue)} items in threat analyzer queue")
+            await self.threat_analyzer._process_queue()
+        
+        # Wait for any active processing to complete
+        timeout = 30  # 30 second timeout
+        wait_time = 0
+        while self.threat_analyzer.processing and wait_time < timeout:
+            self.logger.debug("Waiting for threat analyzer to complete processing...")
+            await asyncio.sleep(1)
+            wait_time += 1
+        
+        if self.threat_analyzer.processing:
+            self.logger.warning("Timeout waiting for threat analyzer to complete. Forcing state reset.")
+            self.threat_analyzer.processing = False
+        
+        # Now attempt to rename all queued files
+        await self._rename_processed_files()
+        
+        self.logger.info(f"Force completion finished. Files remaining to rename: {len(self.files_to_rename)}")
+    
+    def get_status_info(self):
+        """Get current status information for debugging"""
+        return {
+            'processed_files': list(self.processed_files),
+            'files_to_rename': dict(self.files_to_rename),
+            'file_positions': dict(self.file_positions),
+            'threat_analyzer_processing': self.threat_analyzer.processing,
+            'threat_analyzer_queue_length': len(self.threat_analyzer.queue),
+            'running': self.running
+        }
