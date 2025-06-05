@@ -79,15 +79,14 @@ class ReportGenerator:
     
     async def generate_report(self, 
                             time_range: Optional[int] = None, 
-                            output_format: str = 'html',
-                            force: bool = False) -> str:
+                            force: bool = False) -> List[str]: # Return list of paths
         """Generate a report of security threats"""
         current_time = time.time()
         
         # Check if we've generated a report recently (to prevent duplicates)
         if not force and (current_time - self.last_report_time) < self.min_report_interval:
             self.logger.info(f"Skipping report generation - last report was generated {int(current_time - self.last_report_time)} seconds ago")
-            return ""
+            return [] # Return empty list if skipped
             
         self.logger.info("Generating security threat report...")
         
@@ -121,78 +120,72 @@ class ReportGenerator:
             # Skip report generation if there are no threats and this is not a forced report
             if not threats and not force:
                 self.logger.info("No threats found for this time period. Skipping report generation.")
-                return ""
+                return [] # Return empty list if skipped
                 
             # If it's a forced report and there are no threats, log a warning
             if not threats and force:
                 self.logger.warning("Generating a report with no threats because force=True")
             
-            # Generate the report
-            if output_format.lower() == 'json':
-                report_content = self._generate_json_report(threats, start_time, end_time)
-                file_ext = 'json'
-            else:
-                report_content = self._generate_html_report(threats, start_time, end_time)
-                file_ext = 'html'
+            generated_report_paths = []
+            report_formats = getattr(self.settings, 'report_formats', ['html']) # Default to HTML if not set
             
-            # Log threat count for debugging
-            self.logger.info(f"Found {len(threats)} threats for report")
-            if threats:
-                for idx, threat in enumerate(threats):
-                    self.logger.debug(f"Threat {idx+1}: {threat.get('summary', 'No summary')} - {threat.get('severity', 'UNKNOWN')}")
-            
-            # Save the report
-            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-            report_filename = f"security_report_{timestamp}.{file_ext}"
-            report_path = os.path.join(self.settings.output_log_dir, report_filename)
-            
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(report_path), exist_ok=True)
-            
-            # Write report to file
-            with open(report_path, 'w', encoding='utf-8') as f:
-                f.write(report_content)
-            
-            self.logger.info(f"Report generated successfully: {report_path}")
-            
-            # Update last report time
-            self.last_report_time = time.time()
-            
-            # Create 'latest' symlink or copy
-            latest_path = os.path.join(self.settings.output_log_dir, f"latest_report.{file_ext}")
-            try:
-                if os.path.exists(latest_path):
-                    os.remove(latest_path)
-                # Use the absolute path but from the same directory for the symlink target
-                report_filename = os.path.basename(report_path)
-                report_dir = os.path.dirname(latest_path)
-                target_path = os.path.join(report_dir, report_filename)
-                os.symlink(report_filename, latest_path)  # Use relative path for symlink
-                self.logger.info(f"Created symlink: {latest_path} -> {report_filename}")
-                
-                # Verify the link was created successfully and points to the right file
-                if os.path.islink(latest_path):
-                    link_target = os.readlink(latest_path)
-                    if not os.path.exists(os.path.join(report_dir, link_target)):
-                        self.logger.warning(f"Symlink target does not exist: {link_target}")
-                        # As a fallback, create a copy
-                        with open(latest_path, 'w', encoding='utf-8') as f:
-                            f.write(report_content)
-                            self.logger.info(f"Created copy instead of symlink for latest_report.{file_ext}")
-            except OSError as e:
-                self.logger.warning(f"Could not create symlink, creating copy instead: {e}")
-                # Symlinks might not be supported, create a copy instead
-                with open(latest_path, 'w', encoding='utf-8') as f:
-                    f.write(report_content)
-            
-            # After generating and saving the report, update the reports.json file
-            await self._update_reports_json()
+            for output_format in report_formats:
+                report_content = ""
+                file_ext = ""
+                if output_format.lower() == 'json':
+                    report_content = self._generate_json_report(threats, start_time, end_time)
+                    file_ext = 'json'
+                elif output_format.lower() == 'html':
+                    report_content = self._generate_html_report(threats, start_time, end_time)
+                    file_ext = 'html'
+                else:
+                    self.logger.warning(f"Unsupported report format: {output_format}. Skipping.")
+                    continue
 
-            return report_path
+                # Log threat count for debugging
+                self.logger.info(f"Found {len(threats)} threats for report ({output_format} format)")
+                if threats:
+                    for idx, threat in enumerate(threats):
+                        self.logger.debug(f"Threat {idx+1}: {threat.get('summary', 'No summary')} - {threat.get('severity', 'UNKNOWN')}")
+                
+                # Save the report
+                timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                report_filename = f"security_report_{timestamp}.{file_ext}"
+                report_path = os.path.join(self.settings.output_log_dir, report_filename)
+                
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(report_path), exist_ok=True)
+                
+                # Write report to file
+                with open(report_path, 'w', encoding='utf-8') as f:
+                    f.write(report_content)
+                
+                self.logger.info(f"Report generated successfully: {report_path}")
+                generated_report_paths.append(report_path)
+                
+                # Create 'latest' symlink or copy for the current format
+                latest_path = os.path.join(self.settings.output_log_dir, f"latest_report.{file_ext}")
+                try:
+                    if os.path.exists(latest_path):
+                        os.remove(latest_path)
+                    report_filename_relative = os.path.basename(report_path)
+                    os.symlink(report_filename_relative, latest_path)
+                    self.logger.info(f"Created symlink: {latest_path} -> {report_filename_relative}")
+                except OSError as e:
+                    self.logger.warning(f"Could not create symlink for {file_ext} report, creating copy instead: {e}")
+                    with open(latest_path, 'w', encoding='utf-8') as f:
+                        f.write(report_content)
+            
+            # Update last report time only if at least one report was generated
+            if generated_report_paths:
+                self.last_report_time = time.time()
+                await self._update_reports_json() # Update reports.json after all formats are generated
+
+            return generated_report_paths
             
         except Exception as e:
             self.logger.error(f"Error generating report: {e}")
-            return ""
+            return []
     
     def _generate_json_report(self, threats: List[Dict[str, Any]], start_time: float, end_time: float) -> str:
         """Generate a JSON report"""
@@ -808,7 +801,13 @@ class ReportGenerator:
         """Generate HTML for the threats section using modern card-based design"""            
         threats_html = ""
         
-        for threat in threats:
+        # Define severity order
+        severity_order = {'CRITICAL': 0, 'ERROR': 1, 'WARNING': 2, 'INFO': 3, 'LOW': 4, 'UNKNOWN': 5}
+        
+        # Sort threats by severity
+        sorted_threats = sorted(threats, key=lambda x: severity_order.get(x.get('severity', 'UNKNOWN'), 5))
+        
+        for threat in sorted_threats: # Iterate over sorted threats
             try:
                 severity = threat.get('severity', 'INFO')
                 timestamp = datetime.datetime.fromtimestamp(threat.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M:%S')

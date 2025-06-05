@@ -1,0 +1,28 @@
+# AI Security Logger Test Dependencies
+# Add these to requirements.txt for testing
+
+# Core testing framework
+pytest>=7.0.0
+pytest-asyncio>=0.20.0
+pytest-cov>=4.0.0
+pytest-html>=3.0.0
+pytest-xdist>=3.0.0
+pytest-timeout>=2.0.0
+
+# Performance monitoring
+psutil>=5.8.0
+
+# Mock and testing utilities  
+responses>=0.22.0
+aioresponses>=0.7.0
+
+# Code quality
+flake8>=5.0.0
+black>=22.0.0
+isort>=5.10.0
+bandit>=1.7.0
+safety>=2.0.0
+
+# Optional development tools
+mypy>=0.991
+pre-commit>=2.20.0

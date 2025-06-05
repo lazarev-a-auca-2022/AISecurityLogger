@@ -236,10 +236,17 @@ class Database:
     async def delete_threat(self, threat_id: int) -> bool:
         """Delete a threat by its ID"""
         try:
-            await self.db.execute("DELETE FROM threats WHERE id = ?", (threat_id,))
+            cursor = await self.db.execute("DELETE FROM threats WHERE id = ?", (threat_id,))
             await self.db.commit()
-            self.logger.info(f"Deleted threat with ID {threat_id}")
-            return True
+            
+            # Check if any rows were affected
+            rows_affected = cursor.rowcount
+            if rows_affected > 0:
+                self.logger.info(f"Deleted threat with ID {threat_id}")
+                return True
+            else:
+                self.logger.warning(f"No threat found with ID {threat_id}")
+                return False
             
         except Exception as e:
             self.logger.error(f"Error deleting threat: {e}")

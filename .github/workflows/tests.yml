@@ -1,0 +1,163 @@
+# GitHub Actions Workflow for AI Security Logger Tests
+
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11]
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov pytest-html pytest-xdist psutil
+    
+    - name: Create test directories
+      run: |
+        mkdir -p test_artifacts
+        mkdir -p data/db
+        mkdir -p data/logs
+        mkdir -p reports
+    
+    - name: Run unit tests
+      run: |
+        python -m pytest tests/unit/ \
+          --cov=src \
+          --cov-report=xml:test_artifacts/coverage.xml \
+          --cov-report=html:test_artifacts/coverage \
+          --cov-report=term \
+          --junit-xml=test_artifacts/junit.xml \
+          --html=test_artifacts/report.html \
+          --self-contained-html \
+          -v
+    
+    - name: Run integration tests
+      run: |
+        python -m pytest tests/integration/ \
+          --junit-xml=test_artifacts/integration_junit.xml \
+          --html=test_artifacts/integration_report.html \
+          --self-contained-html \
+          -v
+    
+    - name: Run performance tests (Python 3.11 only)
+      if: matrix.python-version == '3.11'
+      run: |
+        python -m pytest tests/performance/ \
+          -m performance \
+          --junit-xml=test_artifacts/performance_junit.xml \
+          --html=test_artifacts/performance_report.html \
+          --self-contained-html \
+          -v
+    
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-artifacts-python-${{ matrix.python-version }}
+        path: test_artifacts/
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: test_artifacts/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+    
+    - name: Check test results
+      if: always()
+      run: |
+        if [ -f test_artifacts/junit.xml ]; then
+          echo "Unit test results:"
+          python -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('test_artifacts/junit.xml')
+          root = tree.getroot()
+          tests = root.get('tests', '0')
+          failures = root.get('failures', '0')
+          errors = root.get('errors', '0')
+          print(f'Tests: {tests}, Failures: {failures}, Errors: {errors}')
+          "
+        fi
+
+  docker-test:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build Docker image
+      run: |
+        docker build -t ai-security-logger .
+    
+    - name: Test Docker container
+      run: |
+        # Start container in background
+        docker run -d --name test-container \
+          -v $(pwd)/data:/app/data \
+          -v $(pwd)/reports:/app/reports \
+          ai-security-logger
+        
+        # Wait for container to start
+        sleep 10
+        
+        # Check if container is running
+        docker ps | grep test-container
+        
+        # Check container logs
+        docker logs test-container
+        
+        # Clean up
+        docker stop test-container
+        docker rm test-container
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run security scan with bandit
+      run: |
+        pip install bandit[toml]
+        bandit -r src/ -f json -o security-report.json || true
+    
+    - name: Run dependency security check
+      run: |
+        pip install safety
+        safety check --json --output safety-report.json || true
+    
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          security-report.json
+          safety-report.json
