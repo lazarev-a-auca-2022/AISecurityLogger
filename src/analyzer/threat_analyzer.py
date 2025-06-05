@@ -602,14 +602,21 @@ class ThreatAnalyzer:
                     }
             
             # Create result object from the successfully parsed JSON
+            threat_detected_from_ai = response_data.get("threat_detected", False)
+            severity_from_ai = response_data.get("severity", "INFO").upper()
+
+            # Infer threat_detected from severity if not explicitly true
+            if not threat_detected_from_ai and severity_from_ai in ["WARNING", "ERROR", "CRITICAL"]:
+                threat_detected_from_ai = True
+
             result = {
                 "timestamp": time.time(),
-                "threat_detected": response_data.get("threat_detected", False),
-                "severity": response_data.get("severity", "INFO"),
+                "threat_detected": threat_detected_from_ai,
+                "severity": severity_from_ai,
                 "summary": response_data.get("summary", "No summary provided"),
                 "details": response_data.get("details", ""),
                 "recommended_actions": response_data.get("recommended_actions", ""),
-                "log_entries": log_entries
+                "log_entries": log_entries  # Always include log_entries for context
             }
             
             self.logger.debug(f"Successfully processed AI response: {result['summary']}")

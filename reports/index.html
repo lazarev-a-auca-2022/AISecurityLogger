@@ -893,11 +893,14 @@
                         <i class="fas fa-cogs"></i>
                     </div>
                     <div>
-                        <h2 class="card-title gradient-text">Report Generation</h2>
+                        <h2 class="card-title gradient-text">Test Report Generation</h2>
                     </div>
                 </div>
-                <p class="card-description">Generate custom security reports with specific parameters for different application types.</p>
+                <p class="card-description">Generate test logs and security reports with custom parameters. This creates sample log data for testing the AI security analysis system.</p>
                 <div class="btn-group">
+                    <button id="generateCustomReportBtn" class="btn btn-primary">
+                        <i class="fas fa-flask"></i> Generate Test Report
+                    </button>
                     <button id="refreshReportsBtn" class="btn btn-secondary">
                         <i class="fas fa-sync-alt"></i> Refresh Reports
                     </button>
@@ -942,7 +945,7 @@
                 <a href="#"><i class="fas fa-question-circle"></i> Support</a>
                 <a href="#"><i class="fab fa-github"></i> GitHub</a>
             </div>
-            <p><strong>AI Security Logger v2.0</strong> - Powered by Advanced ML Models</p>
+            <p><strong>AI Security Logger v1.2.54</strong> - Powered by Openrouter</p>
             <p>Built for FastPanel Server Management & Security Monitoring</p>
         </footer>
 
@@ -956,39 +959,54 @@
     <div id="reportModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h2><i class="fas fa-plus-circle"></i> Generate Custom Report</h2>
+            <h2><i class="fas fa-flask"></i> Generate Test Report</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Create sample log data and generate a security analysis report for testing purposes.</p>
             
             <form id="reportForm">
                 <div class="form-group">
                     <label class="form-label" for="appType">Application Type</label>
                     <select id="appType" class="form-select" required>
-                        <option value="generic">Generic</option>
-                        <option value="apache">Apache</option>
-                        <option value="nginx">Nginx</option>
+                        <option value="generic">Generic Application</option>
+                        <option value="apache">Apache Web Server</option>
+                        <option value="nginx">Nginx Web Server</option>
                         <option value="wordpress">WordPress</option>
                     </select>
+                    <small style="color: var(--text-secondary); font-size: 0.85rem;">Choose the type of application logs to simulate</small>
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label" for="numLogs">Number of Logs</label>
-                    <input type="number" id="numLogs" class="form-input" value="10" min="1" max="1000" required>
+                    <label class="form-label" for="numLogs">Number of Log Entries</label>
+                    <input type="number" id="numLogs" class="form-input" value="20" min="5" max="500" required>
+                    <small style="color: var(--text-secondary); font-size: 0.85rem;">Number of log entries to generate (5-500)</small>
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label" for="interval">Interval (seconds)</label>
-                    <input type="number" id="interval" class="form-input" value="1.0" min="0.1" step="0.1" required>
+                    <label class="form-label" for="interval">Generation Interval (seconds)</label>
+                    <input type="number" id="interval" class="form-input" value="0.5" min="0.1" max="5.0" step="0.1" required>
+                    <small style="color: var(--text-secondary); font-size: 0.85rem;">Time between each log entry generation (0.1-5.0 seconds)</small>
                 </div>
                 
                 <div class="form-group">
                     <div class="checkbox-group">
                         <input type="checkbox" id="includeSecurity" checked>
-                        <label class="form-label" for="includeSecurity">Include Security Logs</label>
+                        <label class="form-label" for="includeSecurity">Include Security Events</label>
                     </div>
+                    <small style="color: var(--text-secondary); font-size: 0.85rem;">Generate security-related log entries for threat analysis</small>
+                </div>
+                
+                <div style="background: var(--background-color); padding: 1rem; border-radius: 8px; margin: 1.5rem 0; border: 1px solid var(--border-color);">
+                    <h4 style="margin: 0 0 0.5rem 0; color: var(--text-primary);"><i class="fas fa-info-circle"></i> What happens next?</h4>
+                    <ul style="margin: 0; padding-left: 1.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+                        <li>Test logs will be generated in the background</li>
+                        <li>The AI system will analyze the logs for security threats</li>
+                        <li>A security report will be automatically created</li>
+                        <li>The new report will appear in the reports list below</li>
+                    </ul>
                 </div>
                 
                 <div class="btn-group">
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-rocket"></i> Generate Report
+                        <i class="fas fa-rocket"></i> Generate Test Report
                     </button>
                     <button type="button" class="btn btn-secondary" onclick="closeModal()">
                         <i class="fas fa-times"></i> Cancel
@@ -1081,9 +1099,112 @@
 
             function closeModal() {
                 modal.style.display = 'none';
+                // Reset form when closing
+                resetForm();
+            }
+
+            function resetForm() {
+                document.getElementById('numLogs').value = '20';
+                document.getElementById('interval').value = '0.5';
+                document.getElementById('appType').value = 'generic';
+                document.getElementById('includeSecurity').checked = true;
+            }
+
+            function showNotification(message, type = 'info') {
+                // Create notification element if it doesn't exist
+                let notification = document.getElementById('notification');
+                if (!notification) {
+                    notification = document.createElement('div');
+                    notification.id = 'notification';
+                    notification.style.cssText = `
+                        position: fixed;
+                        top: 2rem;
+                        right: 2rem;
+                        z-index: 10000;
+                        max-width: 400px;
+                        padding: 1rem 1.5rem;
+                        border-radius: 8px;
+                        color: white;
+                        font-weight: 500;
+                        box-shadow: var(--shadow-large);
+                        transform: translateX(100%);
+                        transition: transform 0.3s ease;
+                        display: flex;
+                        align-items: center;
+                        gap: 0.75rem;
+                    `;
+                    document.body.appendChild(notification);
+                }
+
+                // Set notification style based on type
+                const colors = {
+                    'success': 'var(--success-color)',
+                    'error': 'var(--error-color)',
+                    'warning': 'var(--warning-color)',
+                    'info': 'var(--info-color)'
+                };
+
+                const icons = {
+                    'success': 'fas fa-check-circle',
+                    'error': 'fas fa-exclamation-triangle',
+                    'warning': 'fas fa-exclamation-circle',
+                    'info': 'fas fa-info-circle'
+                };
+
+                notification.style.background = colors[type] || colors['info'];
+                notification.innerHTML = `
+                    <i class="${icons[type] || icons['info']}"></i>
+                    <span>${message}</span>
+                    <button onclick="hideNotification()" style="background: none; border: none; color: white; cursor: pointer; font-size: 1.2rem; margin-left: auto;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+
+                // Show notification
+                notification.style.transform = 'translateX(0)';
+
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    hideNotification();
+                }, 5000);
+            }
+
+            function hideNotification() {
+                const notification = document.getElementById('notification');
+                if (notification) {
+                    notification.style.transform = 'translateX(100%)';
+                }
+            }
+
+            function validateForm() {
+                const numLogs = parseInt(document.getElementById('numLogs').value);
+                const interval = parseFloat(document.getElementById('interval').value);
+                const appType = document.getElementById('appType').value;
+
+                if (!appType) {
+                    showNotification('Please select an application type', 'error');
+                    return false;
+                }
+
+                if (isNaN(numLogs) || numLogs < 5 || numLogs > 500) {
+                    showNotification('Number of logs must be between 5 and 500', 'error');
+                    return false;
+                }
+
+                if (isNaN(interval) || interval < 0.1 || interval > 5.0) {
+                    showNotification('Interval must be between 0.1 and 5.0 seconds', 'error');
+                    return false;
+                }
+
+                return true;
             }
 
             function generateCustomReport() {
+                // Validate form before proceeding
+                if (!validateForm()) {
+                    return;
+                }
+
                 const appType = document.getElementById('appType').value;
                 const numLogs = parseInt(document.getElementById('numLogs').value);
                 const interval = parseFloat(document.getElementById('interval').value);
@@ -1112,7 +1233,16 @@
                 })
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        return response.text().then(text => {
+                            try {
+                                // Try to parse as JSON first
+                                const errorData = JSON.parse(text);
+                                throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.message || errorData.error || text}`);
+                            } catch (e) {
+                                // If not JSON or parsing failed, use the raw text
+                                throw new Error(`HTTP error! status: ${response.status}, details: ${text}`);
+                            }
+                        });
                     }
                     return response.json();
                 })
@@ -1127,7 +1257,18 @@
                 })
                 .catch(error => {
                     console.error('Error generating report:', error);
-                    showNotification(`Error generating report: ${error.message}`, 'error');
+                    showNotification(`Error generating report: ${error.message}. Check console for details.`, 'error');
+                    // Add more detailed console logging for debugging
+                    console.log('Request details:', {
+                        url: window.generateLogsUrl,
+                        payload: {
+                            num_logs: numLogs,
+                            interval: interval,
+                            include_security: includeSecurity,
+                            app_type: appType,
+                            log_file_name: logFileName
+                        }
+                    });
                 })
                 .finally(() => {
                     submitBtn.innerHTML = originalText;
@@ -1276,11 +1417,11 @@
             function initializeServiceUrls() {
                 // Determine the correct base URL for health and metrics endpoints
                 const isFileProtocol = window.location.protocol === 'file:';
-                const isDirectAccess = !window.location.hostname || window.location.hostname === 'localhost' && window.location.port !== '8359';
+                const isDirectAccess = !window.location.hostname || window.location.hostname === 'localhost' && window.location.port !== '5356';
                 
                 // If accessing via file:// or not through nginx proxy, use direct health server
-                if (isFileProtocol || (window.location.hostname === 'localhost' && window.location.port !== '8359')) {
-                    const healthBaseUrl = 'http://localhost:8359';
+                if (isFileProtocol || (window.location.hostname === 'localhost' && window.location.port !== '5356')) {
+                    const healthBaseUrl = 'http://localhost:5356';
                     window.healthUrl = healthBaseUrl + '/health';
                     window.metricsUrl = healthBaseUrl + '/metrics';
                     window.generateLogsUrl = healthBaseUrl + '/generate_logs';

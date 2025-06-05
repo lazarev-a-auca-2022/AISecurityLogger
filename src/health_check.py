@@ -105,7 +105,11 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             include_security = params.get('include_security', True)
             app_type = params.get('app_type', 'generic')
             
-            log_file_name = f"../data/logs/{app_type}_sample.log"
+            # Use the log_file_name from the request or fallback to default naming pattern
+            log_file_name = params.get('log_file_name', f"{app_type}_sample.log")
+            
+            # Make sure the path is absolute
+            log_file_path = str(Path(__file__).parent.parent / "data" / "logs" / log_file_name)
             
             command = [
                 sys.executable, # Use the current Python executable
@@ -113,24 +117,45 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
                 "-n", str(num_logs),
                 "-i", str(interval),
                 "-a", app_type,
-                "-f", log_file_name
+                "-f", log_file_path
             ]
             if not include_security:
                 command.append("--no-security")
 
             logging.getLogger('health').info(f"Executing log generation command: {' '.join(command)}")
             
-            # Run the script in a non-blocking way
-            subprocess.Popen(command, cwd=Path(__file__).parent.parent)
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*') # Allow all origins for simplicity
-            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-            self.end_headers()
-            response = {'status': 'success', 'message': 'Log generation initiated.'}
-            self.wfile.write(json.dumps(response).encode('utf-8'))
+            try:
+                # Run the script in a non-blocking way
+                process = subprocess.Popen(
+                    command, 
+                    cwd=Path(__file__).parent.parent,
+                    stderr=subprocess.PIPE,
+                    stdout=subprocess.PIPE
+                )
+                
+                # Start a thread to monitor the process output for any errors
+                def monitor_process():
+                    stdout, stderr = process.communicate()
+                    if process.returncode != 0:
+                        logging.getLogger('health').error(f"Log generation process failed with exit code {process.returncode}")
+                        if stderr:
+                            logging.getLogger('health').error(f"Error output: {stderr.decode('utf-8', errors='replace')}")
+                
+                monitor_thread = Thread(target=monitor_process)
+                monitor_thread.daemon = True
+                monitor_thread.start()
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*') # Allow all origins for simplicity
+                self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+                self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+                self.end_headers()
+                response = {'status': 'success', 'message': 'Log generation initiated.'}
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+            except Exception as e:
+                logging.getLogger('health').error(f"Failed to start log generation process: {e}")
+                self.send_error(500, f"Internal Server Error: {e}")
             
         except json.JSONDecodeError:
             self.send_error(400, "Invalid JSON")
