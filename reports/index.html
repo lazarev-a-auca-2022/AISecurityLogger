@@ -878,10 +878,10 @@
                     <a href="latest_report.html" id="latestReportLink" class="btn btn-primary">
                         <i class="fas fa-file-alt"></i> Latest Report
                     </a>
-                    <a href="http://localhost:5356/health" class="btn btn-success">
+                    <a href="/health" class="btn btn-success">
                         <i class="fas fa-heartbeat"></i> System Health
                     </a>
-                    <a href="http://localhost:5356/metrics" class="btn btn-info">
+                    <a href="/metrics" class="btn btn-info">
                         <i class="fas fa-chart-line"></i> Metrics
                     </a>
                 </div>
@@ -1005,6 +1005,9 @@
             // Initialize theme first before anything else
             initializeTheme();
             
+            // Initialize correct URLs for health and metrics
+            initializeServiceUrls();
+            
             const reportsList = document.getElementById('reportsList');
             const generateCustomReportBtn = document.getElementById('generateCustomReportBtn');
             const refreshReportsBtn = document.getElementById('refreshReportsBtn');
@@ -1094,7 +1097,7 @@
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
                 submitBtn.disabled = true;
 
-                fetch('http://localhost:5356/generate_logs', {
+                fetch(window.generateLogsUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1270,8 +1273,37 @@
                 updateProgressBars();
             }
 
+            function initializeServiceUrls() {
+                // Determine the correct base URL for health and metrics endpoints
+                const isFileProtocol = window.location.protocol === 'file:';
+                const isDirectAccess = !window.location.hostname || window.location.hostname === 'localhost' && window.location.port !== '8359';
+                
+                // If accessing via file:// or not through nginx proxy, use direct health server
+                if (isFileProtocol || (window.location.hostname === 'localhost' && window.location.port !== '8359')) {
+                    const healthBaseUrl = 'http://localhost:5356';
+                    window.healthUrl = healthBaseUrl + '/health';
+                    window.metricsUrl = healthBaseUrl + '/metrics';
+                    window.generateLogsUrl = healthBaseUrl + '/generate_logs';
+                    
+                    // Update the button links
+                    const healthLink = document.querySelector('a[href="/health"]');
+                    const metricsLink = document.querySelector('a[href="/metrics"]');
+                    
+                    if (healthLink) healthLink.href = window.healthUrl;
+                    if (metricsLink) metricsLink.href = window.metricsUrl;
+                    
+                    console.log('Using direct health server URLs:', window.healthUrl, window.metricsUrl, window.generateLogsUrl);
+                } else {
+                    // Use relative paths when served through nginx proxy
+                    window.healthUrl = '/health';
+                    window.metricsUrl = '/metrics';
+                    window.generateLogsUrl = '/generate_logs';
+                    console.log('Using nginx proxy paths:', window.healthUrl, window.metricsUrl, window.generateLogsUrl);
+                }
+            }
+
             function checkSystemStatus() {
-                fetch('http://localhost:5356/health')
+                fetch(window.healthUrl || '/health')
                     .then(response => {
                         const statusElement = document.getElementById('systemStatus');
                         if (response.ok) {

@@ -58,7 +58,7 @@ nano .env
 
 - View logs: `./run.sh logs`
 - Check status: `./run.sh status`
-- Access reports: Open http://localhost:5356/reports/ in your browser
+- Access reports: Open http://localhost:8359 in your browser
 - Stop the application: `./run.sh stop`
 - Rebuild containers: `./run.sh rebuild`
 
