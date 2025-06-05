@@ -1280,7 +1280,7 @@
                 
                 // If accessing via file:// or not through nginx proxy, use direct health server
                 if (isFileProtocol || (window.location.hostname === 'localhost' && window.location.port !== '8359')) {
-                    const healthBaseUrl = 'http://localhost:5356';
+                    const healthBaseUrl = 'http://localhost:8359';
                     window.healthUrl = healthBaseUrl + '/health';
                     window.metricsUrl = healthBaseUrl + '/metrics';
                     window.generateLogsUrl = healthBaseUrl + '/generate_logs';
@@ -1303,9 +1303,12 @@
             }
 
             function checkSystemStatus() {
+                const statusElement = document.getElementById('systemStatus');
+                // Set to checking state initially or when re-checking
+                statusElement.innerHTML = '<i class="fas fa-circle stat-icon" style="color: var(--info-color);"></i><span class="status-indicator status-offline"></span>Checking<span class="loading-spinner" style="margin-left: 8px;"></span>';
+
                 fetch(window.healthUrl || '/health')
                     .then(response => {
-                        const statusElement = document.getElementById('systemStatus');
                         if (response.ok) {
                             statusElement.innerHTML = '<i class="fas fa-circle stat-icon" style="color: var(--success-color);"></i><span class="status-indicator status-online"></span>Online';
                         } else {
@@ -1313,10 +1316,13 @@
                         }
                     })
                     .catch(error => {
-                        const statusElement = document.getElementById('systemStatus');
                         statusElement.innerHTML = '<i class="fas fa-circle stat-icon" style="color: var(--error-color);"></i><span class="status-indicator status-offline"></span>Offline';
+                        console.error('Health check failed:', error);
                     });
             }
+
+            // Periodically check system status every 5 seconds
+            setInterval(checkSystemStatus, 5000);
 
             function formatTimestamp(timestamp) {
                 if (!timestamp || timestamp.length !== 15) return 'Invalid Date';
